@@ -1,4 +1,12 @@
 {
     "target_range" : "50",
-    "SNP_frequency_threshold" : "0.01"
+    "SNP_frequency_threshold" : "0.01",
+    "probe_specifics": [
+	    {
+		    "min_arm_length": 18,
+		    "max_arm_length": 23,
+		    "min_target_length": 45,
+		    "max_target_length": 50
+	    }
+	]
 }

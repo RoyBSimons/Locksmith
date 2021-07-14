@@ -1,10 +1,11 @@
 configfile: "config.json"
-rule all:
-	input: 
-		"data/high_targets_conv.vcf",
-		"data/target_sequences.fa",
-		"data/CpG_in_targets.bed"
 
+rule all:
+	input:
+                "data/high_targets_conv.vcf",
+                "data/target_sequences.fa",
+                "data/CpG_in_targets.bed",
+		"data/all_arms.tsv"
 
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
@@ -93,3 +94,21 @@ rule convert_vcf_file:
                 "sed -e 's/NC_000021.8\t/chr21\t/' |sed -e 's/NC_000022.10\t/chr22\t/' | "
                 "sed -e 's/NC_000023.10\t/chr1\X/' |sed -e 's/NC_000024.9\t/chrY\t/' "
                 "> {output}"
+
+#---------------------------------------------------------------------------------------------------
+#STEP 3
+rule	create_all_arm_combinations:
+	input:
+		targets="data/target_sequences.fa",
+		config_file="config.json"
+	output:
+		"data/all_arms.tsv"
+	shell:
+		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output} -c {input.config_file}"
+
+
+
+
+#---------------------------------------------------------------------------------------------------
+
+
