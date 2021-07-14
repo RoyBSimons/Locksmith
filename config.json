@@ -1,3 +1,4 @@
 {
-    "target_range" : "100"
+    "target_range" : "50",
+    "SNP_frequency_threshold" : "0.01"
 }
