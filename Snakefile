@@ -2,10 +2,10 @@ configfile: "config.json"
 
 rule all:
 	input:
-                "data/high_targets_conv.vcf",
-                "data/target_sequences.fa",
-                "data/CpG_in_targets.bed",
-		"data/all_arms.tsv"
+                "output/SNP_in_targets.vcf",
+                "output/target_sequences.fa",
+                "output/CpG_in_targets.bed",
+		"output/all_arms.tsv"
 
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
@@ -13,28 +13,28 @@ rule create_bed_file_range:
 	input:
 		"data/target_list.bed"
 	output:
-		"data/target_list_range.bed"
+		"output/target_list_range.bed"
 	shell:
 		"python scripts/target_2_target_range_list.py -f {input} -o {output} -r {config[target_range]}"
 
 rule extract_target_sequences:
 	input:
 		genome="data/hg19.fa",
-		bed="data/target_list_range.bed"
+		bed="output/target_list_range.bed"
 	output:
-		"data/target_sequences.fa"
+		"output/target_sequences.fa"
 	shell:
 		"bedtools getfasta -fi {input.genome} -bed {input.bed}  -fo {output}"
 
 #---------------------------------------------------------------------------------------------------
 #STEP 2: FIND CpG AND SNP IN TARGET SEQUENCES
 
-rule convert_bed_file:
+rule convert_bed_file: #Convert the chromosome names from chr1 to NC_000001.10 format to be compatible with the ftp assembly in the find_overlapping_VCF rule
 #https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt
         input:
-                "data/target_list_range.bed"
+                "output/target_list_range.bed"
         output:
-                "data/target_list_range_conv.bed"
+                "output/target_list_range_conv.bed"
         shell:
                 "sed -e 's/chr1\t/NC_000001.10\t/' {input} | sed -e 's/chr2\t/NC_000002.11\t/' | "
                 "sed -e 's/chr3\t/NC_000003.11\t/' |sed -e 's/chr4\t/NC_000004.11\t/' | "
@@ -52,34 +52,34 @@ rule convert_bed_file:
 
 rule find_overlapping_VCF:
 	input:
-		"data/target_list_range_conv.bed"
+		"output/target_list_range_conv.bed"
 	output:
-		"data/targets.vcf"	
+		"output/targets.vcf"	
 	shell:
-		"tabix -f ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz -R {input} > {output}"
+		"tabix ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz -R {input} > {output}"
 
 rule keep_high_freq_SNP:
 	input:
-		"data/targets.vcf"
+		"output/targets.vcf"
 	output:
-		"data/high_targets.vcf"
+		"output/high_targets.vcf"
 	shell:
 		"python scripts/extract_high_frequent_SNPs.py -i {input} -o {output} -f {config[SNP_frequency_threshold]}"
 
 rule find_CpGs_in_targets:
 	input:
-		"data/target_list_range.bed"
+		"output/target_list_range.bed"
 	output:
-		"data/CpG_in_targets.bed"
+		"output/CpG_in_targets.bed"
 	shell:
-		"intersectBed -a {input} -b ~/genomes/hg19/CpG_bed/no_header/CpG_hg19_chr* > {output}"
+		"intersectBed -a {input} -b data/CpG_bed_nomenclature/CpG_hg19_chr* -wa -wb> {output}"
 
 rule convert_vcf_file:
 #https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt
         input:
-                "data/high_targets.vcf"
+                "output/high_targets.vcf"
         output:
-                "data/high_targets_conv.vcf"
+                "output/SNP_in_targets.vcf"
         shell:
                 "sed -e 's/NC_000001.10\t/chr1\t/' {input} | sed -e 's/NC_000002.11\t/chr2\t/' | "
                 "sed -e 's/NC_000003.11\t/chr3\t/' |sed -e 's/NC_000004.11\t/chr4\t/' | "
@@ -95,20 +95,29 @@ rule convert_vcf_file:
                 "sed -e 's/NC_000023.10\t/chr1\X/' |sed -e 's/NC_000024.9\t/chrY\t/' "
                 "> {output}"
 
+
 #---------------------------------------------------------------------------------------------------
 #STEP 3
-rule	create_all_arm_combinations:
+#rule convert_targets:
+#	input:
+#		fasta="output/target_sequences.fa"
+#		cpg="output/CpG_in_targets.bed"
+#	output:
+#		"output/target_sequences_conv.fa"
+#	shell:
+#		"python TAPS_convert_fasta.py -i {input.fasta} -o {output} -c {input.cpg}"
+
+
+#---------------------------------------------------------------------------------------------------
+#STEP 4
+rule create_all_arm_combinations:
 	input:
-		targets="data/target_sequences.fa",
+		targets="output/target_sequences.fa",
 		config_file="config.json"
 	output:
-		"data/all_arms.tsv"
+		"output/all_arms.tsv"
 	shell:
 		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output} -c {input.config_file}"
-
-
-
-
 #---------------------------------------------------------------------------------------------------
 
 

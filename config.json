@@ -6,7 +6,8 @@
 		    "min_arm_length": 18,
 		    "max_arm_length": 23,
 		    "min_target_length": 45,
-		    "max_target_length": 50
+		    "max_target_length": 50,
+		    "cpg_flanks": 5
 	    }
 	]
 }
