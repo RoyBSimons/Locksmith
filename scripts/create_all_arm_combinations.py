@@ -44,6 +44,8 @@ target_length_list=[]
 cg_list=[]
 downstream_tm=[]
 upstream_tm=[]
+downstream_ids=[]
+upstream_ids=[]
 
 with open(outputname, 'w') as handle:
     outputfile=csv.writer(handle, delimiter="\t")
@@ -56,21 +58,25 @@ with open(outputname, 'w') as handle:
                     start_loc_downstream=mid_loc-(target_length-2*cpg_flanks)
                     end_loc_downstream=mid_loc-cpg_flanks-arm_length_downstream
                     for start_loc in range(start_loc_downstream,end_loc_downstream):
-                        end_loc_upstream=start_loc+target_length
+                        start_loc_upstream=start_loc+target_length+arm_length_downstream
                         for arm_length_upstream in range(min_arm_length,max_arm_length+1):
                             new_d_arm=record.seq[start_loc:start_loc+arm_length_downstream]
                             downstream_arms.append(new_d_arm)
+                            downstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc+arm_length_downstream-1)
+                            downstream_ids.append(downstream_id)
                             #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_d_arm),shell=True, stdout=subprocess.PIPE)
                             #oligo_tm_d=proc.communicate()[0]
                             #downstream_tm.append(oligo_tm_d)
-                            new_u_arm=record.seq[end_loc_upstream-arm_length_upstream:end_loc_upstream]
+                            new_u_arm=record.seq[start_loc_upstream:start_loc_upstream+arm_length_upstream]
                             upstream_arms.append(new_u_arm)
+                            upstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
+                            upstream_ids.append(upstream_id)
                             target_length_list.append(target_length)
                             cg_list.append(record.id)
                             #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_u_arm),shell=True, stdout=subprocess.PIPE)
                             #oligo_tm_u=proc.communicate()[0]
                             #upstream_tm.append(oligo_tm_u)
-                            outputfile.writerow([new_u_arm,new_d_arm,record.id,target_length])
+                            outputfile.writerow([new_u_arm,new_d_arm,upstream_id,downstream_id,target_length])
                             #outputfile.writerow([new_u_arm,new_d_arm,oligo_tm_u,oligo_tm_d,record.id,target_length]) 
 #with open(outputname, 'w') as handle:
 #    outputfile=csv.writer(handle, delimiter="\t")
