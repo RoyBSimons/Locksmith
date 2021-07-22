@@ -13,11 +13,19 @@ parser.add_argument("-o", "--output", dest="outputname",
                     help="write report to FILE", metavar="OUTPUTFILE")
 parser.add_argument("-c", "--config_file", dest="config_file",
                     help="Config file with probe specifics", metavar="JSONfile")
+parser.add_argument("-u", "--output_up", dest="outputname_up",
+                    help="write report to FILE", metavar="OUTPUTFILE_UP")
+parser.add_argument("-d", "--output_down", dest="outputname_down",
+                    help="write report to FILE", metavar="OUTPUTFILE_DOWN")
+
+
 
 args = vars(parser.parse_args())
 
 filename=args["filename"]
 outputname=args["outputname"]
+outputname_up=args["outputname_up"]
+outputname_down=args["outputname_down"]
 config_file=args["config_file"]
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
@@ -83,14 +91,14 @@ with open(outputname, 'w') as handle:
 #    for i,row in enumerate(upstream_arms):
 #        outputfile.writerow([row,downstream_arms[i],upstream_tm[i],downstream_tm[i],cg_list[i],target_length_list[i]])
 
-with open(outputname[:-4]+"_upstream_arms.bed","w") as handle:
+with open(outputname_up,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     for i,row in enumerate(upstream_ids):
         chrom=row.split(":")[0]
         start_id=row.split(":")[1].split("-")[0]
         end_id=row.split(":")[1].split("-")[1]
         outputfile.writerow([chrom,start_id,end_id])
-with open(outputname[:-4]+"_downstream_arms.bed","w") as handle:
+with open(outputname_down,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     for i,row in enumerate(downstream_ids):
         chrom=row.split(":")[0]

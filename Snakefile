@@ -115,9 +115,11 @@ rule create_all_arm_combinations:
 		targets="output/target_sequences.fa",
 		config_file="config.json"
 	output:
-		"output/all_arms.tsv"
+		tsv="output/all_arms.tsv", 
+		up="output/all_arms_upstream.bed",
+		down="output/all_arms_downstream.bed"
 	shell:
-		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output} -c {input.config_file}"
+		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output.tsv} -c {input.config_file} -u {output.up} -d {output.down}"
 #---------------------------------------------------------------------------------------------------
 
 
