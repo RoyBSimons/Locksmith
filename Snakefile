@@ -97,7 +97,7 @@ rule convert_vcf_file:
 
 
 #---------------------------------------------------------------------------------------------------
-#STEP 3
+#STEP X
 #rule convert_targets:
 #	input:
 #		fasta="output/target_sequences.fa"
@@ -109,17 +109,34 @@ rule convert_vcf_file:
 
 
 #---------------------------------------------------------------------------------------------------
-#STEP 4
+#STEP 3
 rule create_all_arm_combinations:
 	input:
 		targets="output/target_sequences.fa",
-		config_file="config.json"
+		config_file="config.json",
+		bed="output/target_list_range.bed"
 	output:
 		tsv="output/all_arms.tsv", 
 		up="output/all_arms_upstream.bed",
 		down="output/all_arms_downstream.bed"
 	shell:
-		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output.tsv} -c {input.config_file} -u {output.up} -d {output.down}"
+		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {output.tsv} -c {input.config_file} -u {output.up} -d {output.down} -b {input.bed}"
 #---------------------------------------------------------------------------------------------------
-
+#STEP 4
+rule report_SNP_and_CpG_in_arms:
+	input:
+		cpg="CpG_in_targets.bed",
+		snp="SNP_in_targets.vcf",
+		down="all_arms_downstream.bed",
+		up="all_arms_upstream.bed",
+		arms="all_arms.tsv"
+	output:
+		cpg_up="all_arms_upstream_cpg.bed",
+		cpg_down="all_arms_downstream_cpg.bed",
+		snp_up="all_arms_upstream_snp.bed",
+		snp_down="all_arms_downstream_snp.bed",
+		arms="cpg_snp_free_arms.tsv"
+	shell:
+		"bedtools intersect -a {input.up} -b {input.cpg} > {output.cpg_up}"
+		
 

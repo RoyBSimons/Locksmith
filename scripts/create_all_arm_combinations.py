@@ -17,12 +17,13 @@ parser.add_argument("-u", "--output_up", dest="outputname_up",
                     help="write report to FILE", metavar="OUTPUTFILE_UP")
 parser.add_argument("-d", "--output_down", dest="outputname_down",
                     help="write report to FILE", metavar="OUTPUTFILE_DOWN")
-
-
+parser.add_argument("-b", "--bed", dest="bedfile",
+                    help="Bed file containing the targets", metavar="BED")
 
 args = vars(parser.parse_args())
 
 filename=args["filename"]
+bedfile=args["bedfile"]
 outputname=args["outputname"]
 outputname_up=args["outputname_up"]
 outputname_down=args["outputname_down"]
@@ -54,6 +55,7 @@ downstream_tm=[]
 upstream_tm=[]
 downstream_ids=[]
 upstream_ids=[]
+record_list=[]
 
 with open(outputname, 'w') as handle:
     outputfile=csv.writer(handle, delimiter="\t")
@@ -80,7 +82,7 @@ with open(outputname, 'w') as handle:
                             upstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
                             upstream_ids.append(upstream_id)
                             target_length_list.append(target_length)
-                            cg_list.append(record.id)
+                            record_list.append(record.id)
                             #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_u_arm),shell=True, stdout=subprocess.PIPE)
                             #oligo_tm_u=proc.communicate()[0]
                             #upstream_tm.append(oligo_tm_u)
@@ -89,7 +91,19 @@ with open(outputname, 'w') as handle:
 #with open(outputname, 'w') as handle:
 #    outputfile=csv.writer(handle, delimiter="\t")
 #    for i,row in enumerate(upstream_arms):
-#        outputfile.writerow([row,downstream_arms[i],upstream_tm[i],downstream_tm[i],cg_list[i],target_length_list[i]])
+#        outputfile.writerow([row,downstream_arms[i],upstream_tm[i],downstream_tm[i],record_list[i],target_length_list[i]])
+cg_id_list_in=[]
+record_id_list_in=[]
+with open(bedfile) as handle:
+    bedreader=csv.reader(handle,delimiter="\t")
+    for row in bedreader:
+        cg_id_list_in.append(row[3])
+        record_id_list_in.append(row[0]+":"+row[1]+"-"+row[2])
+cg_id_list=[]
+for record_id in record_list:
+    cg_id=cg_id_list_in[record_id_list_in.index(record_id)]
+    cg_id_list.append(cg_id)
+
 
 with open(outputname_up,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
@@ -97,14 +111,14 @@ with open(outputname_up,"w") as handle:
         chrom=row.split(":")[0]
         start_id=row.split(":")[1].split("-")[0]
         end_id=row.split(":")[1].split("-")[1]
-        outputfile.writerow([chrom,start_id,end_id])
+        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]])
 with open(outputname_down,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     for i,row in enumerate(downstream_ids):
         chrom=row.split(":")[0]
         start_id=row.split(":")[1].split("-")[0]
         end_id=row.split(":")[1].split("-")[1]
-        outputfile.writerow([chrom,start_id,end_id])
+        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]])
 
 #return fasta 
 
