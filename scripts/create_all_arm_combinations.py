@@ -56,12 +56,14 @@ upstream_tm=[]
 downstream_ids=[]
 upstream_ids=[]
 record_list=[]
+arm_nr_list=[]
 
 with open(outputname, 'w') as handle:
     outputfile=csv.writer(handle, delimiter="\t")
     with open(filename) as handle:
         for record in SeqIO.parse(handle,"fasta"):
             #reverse Convert the record
+            i=0
             target=record.reverse_complement()
             for target_length in range(min_target_length,max_target_length+1): #loop over range of target lengths, including the maximum
                 for arm_length_downstream in range(min_arm_length,max_arm_length+1):
@@ -83,10 +85,12 @@ with open(outputname, 'w') as handle:
                             upstream_ids.append(upstream_id)
                             target_length_list.append(target_length)
                             record_list.append(record.id)
+                            arm_nr_list.append(i)
+                            i+=1
                             #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_u_arm),shell=True, stdout=subprocess.PIPE)
                             #oligo_tm_u=proc.communicate()[0]
                             #upstream_tm.append(oligo_tm_u)
-                            outputfile.writerow([new_u_arm,new_d_arm,upstream_id,downstream_id,target_length])
+#                            outputfile.writerow([new_u_arm,new_d_arm,upstream_id,downstream_id,target_length])
                             #outputfile.writerow([new_u_arm,new_d_arm,oligo_tm_u,oligo_tm_d,record.id,target_length]) 
 #with open(outputname, 'w') as handle:
 #    outputfile=csv.writer(handle, delimiter="\t")
@@ -104,6 +108,10 @@ for record_id in record_list:
     cg_id=cg_id_list_in[record_id_list_in.index(record_id)]
     cg_id_list.append(cg_id)
 
+with open(outputname, 'w') as handle:
+    outputfile=csv.writer(handle, delimiter="\t")
+    for i,row in enumerate(upstream_arms):
+        outputfile.writerow([row,downstream_arms[i],upstream_ids[i],downstream_ids[i],cg_id_list[i]+"_arm_"+str(arm_nr_list[i]),target_length_list[i]])
 
 with open(outputname_up,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
@@ -111,15 +119,11 @@ with open(outputname_up,"w") as handle:
         chrom=row.split(":")[0]
         start_id=row.split(":")[1].split("-")[0]
         end_id=row.split(":")[1].split("-")[1]
-        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]])
+        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]+"_arm_"+str(arm_nr_list[i])])
 with open(outputname_down,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     for i,row in enumerate(downstream_ids):
         chrom=row.split(":")[0]
         start_id=row.split(":")[1].split("-")[0]
         end_id=row.split(":")[1].split("-")[1]
-        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]])
-
-#return fasta 
-
-
+        outputfile.writerow([chrom,start_id,end_id,cg_id_list[i]+"_arm_"+str(arm_nr_list[i])])
