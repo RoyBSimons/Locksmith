@@ -1,4 +1,5 @@
 {
+    "cpg_bed_path" : "data/CpG_bed_nomenclature/CpG_hg19_chr*",
     "target_range" : "50",
     "SNP_frequency_threshold" : "0.01",
     "probe_specifics": [
