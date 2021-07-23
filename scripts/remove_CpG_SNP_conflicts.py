@@ -15,6 +15,12 @@ parser.add_argument("-u", "--input_up", dest="inputname_up",
                     help="write report to FILE", metavar="INPUTFILE_UP")
 parser.add_argument("-d", "--intput_down", dest="inputname_down",
                     help="write report to FILE", metavar="INPUTFILE_DOWN")
+parser.add_argument("-s", "--input_SNP_up", dest="inputname_SNP_up",
+                    help="write report to FILE", metavar="INPUTFILESNP_UP")
+parser.add_argument("-t", "--intput_SNP_down", dest="inputname_SNP_down",
+                    help="write report to FILE", metavar="INPUTFILESNP_DOWN")
+
+
 
 args = vars(parser.parse_args())
 
@@ -22,13 +28,15 @@ filename=args["filename"]
 outputname=args["outputname"]
 inputname_up=args["inputname_up"]
 inputname_down=args["inputname_down"]
+inputname_SNP_up=args["inputname_SNP_up"]
+inputname_SNP_down=args["inputname_SNP_down"]
 
 cpg_list_up=[]
 cpg_list_down=[]
-cpg_free_arms=[]
-cpg_rows=[]
-cpgs=[]
+snp_list_up=[]
+snp_list_down=[]
 
+#CpG
 with open(inputname_up) as handle:
     reader=csv.reader(handle,delimiter="\t")
     for row in reader:
@@ -39,14 +47,25 @@ with open(inputname_down) as handle:
     for row in reader:
         cpg_list_down.append(int(row[-1]))
 
-combined_cpg_list=list(map(operator.add,cpg_list_up,cpg_list_down))
+#SNP
+with open(inputname_SNP_up) as handle:
+    reader=csv.reader(handle,delimiter="\t")
+    for row in reader:
+        snp_list_up.append(int(row[-1]))
+
+with open(inputname_SNP_down) as handle:
+    reader=csv.reader(handle,delimiter="\t")
+    for row in reader:
+        snp_list_down.append(int(row[-1]))
+
+combined_cpg_snp_list=list(map(operator.add,list(map(operator.add,cpg_list_up,cpg_list_down)),list(map(operator.add,snp_list_up,snp_list_down))))
 
 with open(outputname,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     with open(filename) as handle:
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
-            if combined_cpg_list[i] == 0:
+            if combined_cpg_snp_list[i] == 0:
                 outputfile.writerow(row)
             else:
                 pass

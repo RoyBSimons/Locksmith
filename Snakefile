@@ -79,7 +79,8 @@ rule convert_vcf_file:
         input:
                 "output/high_targets.vcf"
         output:
-                "output/SNP_in_targets.vcf"
+                tmp_snp="output/SNP_in_targets.vcf",
+		snp="output/SNP_in_targets.bed"
         shell:
                 "sed -e 's/NC_000001.10\t/chr1\t/' {input} | sed -e 's/NC_000002.11\t/chr2\t/' | "
                 "sed -e 's/NC_000003.11\t/chr3\t/' |sed -e 's/NC_000004.11\t/chr4\t/' | "
@@ -92,9 +93,9 @@ rule convert_vcf_file:
                 "sed -e 's/NC_000017.10\t/chr17\t/' |sed -e 's/NC_000018.9\t/chr18\t/' | "
                 "sed -e 's/NC_000019.9\t/chr19\t/' |sed -e 's/NC_000020.10\t/chr20\t/' | "
                 "sed -e 's/NC_000021.8\t/chr21\t/' |sed -e 's/NC_000022.10\t/chr22\t/' | "
-                "sed -e 's/NC_000023.10\t/chr1\X/' |sed -e 's/NC_000024.9\t/chrY\t/' "
-                "> {output}"
-
+                "sed -e 's/NC_000023.10\t/chrX\t/' |sed -e 's/NC_000024.9\t/chrY\t/' "
+                "> {output.tmp_snp} && "
+		"""cat {output.tmp_snp} | awk -F"\\t" "BEGIN {{OFS = FS}}{{print \$1,\$2-1,\$2,\$0}}" | cut -f -3,6- > {output.snp}"""
 
 #---------------------------------------------------------------------------------------------------
 #STEP X
@@ -129,19 +130,21 @@ rule create_all_arm_combinations:
 #STEP 4
 rule report_SNP_and_CpG_in_arms:
 	input:
-#		snp="output/SNP_in_targets.vcf",
+		snp="output/SNP_in_targets.bed",
 		down="output/all_arms_downstream.bed",
 		up="output/all_arms_upstream.bed",
 		arms="output/all_arms.tsv"
 	output:
 		cpg_up="output/all_arms_upstream_cpg.bed",
 		cpg_down="output/all_arms_downstream_cpg.bed",
-#		snp_up="output/all_arms_upstream_snp.bed",
-#		snp_down="output/all_arms_downstream_snp.bed",
+		snp_up="output/all_arms_upstream_snp.bed",
+		snp_down="output/all_arms_downstream_snp.bed",
 		arms="output/cpg_snp_free_arms.tsv"
 	shell:
 		"bedtools intersect -a {input.up} -b {config[cpg_bed_path]} -c > {output.cpg_up} && "
 		"bedtools intersect -a {input.down} -b {config[cpg_bed_path]} -c > {output.cpg_down} && "
-		"python scripts/remove_cpg_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -o {output.arms}" #only CpGs for now
+                "bedtools intersect -a {input.up} -b {input.snp} -c > {output.snp_up} && "
+                "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
+		"python scripts/remove_cpg_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}" #only CpGs for now
 		
 
