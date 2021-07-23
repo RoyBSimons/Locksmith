@@ -138,6 +138,8 @@ rule Obtain_Tm_arms:
 	input:
 		"output/cpg_snp_free_arms.tsv"
 	output:
-		"output/arms_tm.txt"
+		up="output/arms_tm_upstream.txt",
+		down="output/arms_tm_downstream.txt"
 	shell:
-		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output}"""
+		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.up} && """
+		"""while IFS= read -r line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.down}"""
