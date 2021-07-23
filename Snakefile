@@ -2,10 +2,7 @@ configfile: "config.json"
 
 rule all:
 	input:
-                "output/SNP_in_targets.vcf",
-                "output/target_sequences.fa",
-                "output/CpG_in_targets.bed",
-		"output/all_arms.tsv"
+		"output/cpg_snp_free_arms.tsv"
 
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
@@ -50,7 +47,7 @@ rule convert_bed_file: #Convert the chromosome names from chr1 to NC_000001.10 f
                 "sed -e 's/chrX\t/NC_000023.10\t/' |sed -e 's/chrY\t/NC_000024.9\t/' "
                 "> {output}"
 
-rule find_overlapping_VCF:
+rule find_overlapping_VCF:#Obtain all known SNPs 
 	input:
 		"output/target_list_range_conv.bed"
 	output:
@@ -58,7 +55,7 @@ rule find_overlapping_VCF:
 	shell:
 		"tabix ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz -R {input} > {output}"
 
-rule keep_high_freq_SNP:
+rule keep_high_freq_SNP: #Keep the SNPs that have a frequency that is equal or higher than the threshold in the config file:SNP_frequency_threshold.
 	input:
 		"output/targets.vcf"
 	output:
@@ -98,18 +95,6 @@ rule convert_vcf_file:
 		"""cat {output.tmp_snp} | awk -F"\\t" "BEGIN {{OFS = FS}}{{print \$1,\$2-1,\$2,\$0}}" | cut -f -3,6- > {output.snp}"""
 
 #---------------------------------------------------------------------------------------------------
-#STEP X
-#rule convert_targets:
-#	input:
-#		fasta="output/target_sequences.fa"
-#		cpg="output/CpG_in_targets.bed"
-#	output:
-#		"output/target_sequences_conv.fa"
-#	shell:
-#		"python TAPS_convert_fasta.py -i {input.fasta} -o {output} -c {input.cpg}"
-
-
-#---------------------------------------------------------------------------------------------------
 #STEP 3
 rule create_all_arm_combinations:
 	input:
@@ -145,6 +130,14 @@ rule report_SNP_and_CpG_in_arms:
 		"bedtools intersect -a {input.down} -b {config[cpg_bed_path]} -c > {output.cpg_down} && "
                 "bedtools intersect -a {input.up} -b {input.snp} -c > {output.snp_up} && "
                 "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
-		"python scripts/remove_cpg_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}" #only CpGs for now
+		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}" #only CpGs for now
 		
-
+#---------------------------------------------------------------------------------------------------
+#STEP 5
+rule Obtain_Tm_arms:
+	input:
+		"output/cpg_snp_free_arms.tsv"
+	output:
+		"output/arms_tm.txt"
+	shell:
+		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output}"""
