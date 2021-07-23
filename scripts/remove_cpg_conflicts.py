@@ -46,8 +46,7 @@ with open(outputname,"w") as handle:
     with open(filename) as handle:
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
-            cpg_rows.append(row)
             if combined_cpg_list[i] == 0:
-                pass
+                outputfile.writerow(row)
             else:
-                 outputfile.writerow(row)
+                pass
