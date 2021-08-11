@@ -2,7 +2,7 @@ configfile: "config.json"
 
 rule all:
 	input:
-		"output/cpg_snp_free_arms.tsv"
+		"output/selected_arms.tsv"
 
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
@@ -130,7 +130,7 @@ rule report_SNP_and_CpG_in_arms:
 		"bedtools intersect -a {input.down} -b {config[cpg_bed_path]} -c > {output.cpg_down} && "
                 "bedtools intersect -a {input.up} -b {input.snp} -c > {output.snp_up} && "
                 "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
-		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}" #only CpGs for now
+		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}"
 		
 #---------------------------------------------------------------------------------------------------
 #STEP 5
@@ -141,5 +141,28 @@ rule Obtain_Tm_arms:
 		up="output/arms_tm_upstream.txt",
 		down="output/arms_tm_downstream.txt"
 	shell:
-		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.up} && """
-		"""while IFS= read -r line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.down}"""
+		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.down} && """
+		"""while IFS= read -r line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.up}"""
+
+rule Add_Tm_arms:
+	input:
+		up="output/arms_tm_upstream.txt",
+		down="output/arms_tm_downstream.txt",
+		arms="output/cpg_snp_free_arms.tsv"
+	output:
+		"output/cpg_snp_free_arms_tm.tsv"
+	shell:
+		"python scripts/add_tm_to_arms.py -i {input.arms} -o {output} -d {input.down} -u {input.up}"
+		
+#---------------------------------------------------------------------------------------------------
+#STEP 6
+rule Select_arms:
+	input:
+		arms="output/cpg_snp_free_arms_tm.tsv",
+		config_file="config.json",
+		target="data/target_list.bed"
+	output:
+		selected="output/selected_arms.tsv",
+		not_selected="output/not_selected_arms.tsv"
+	shell:
+		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target}"
