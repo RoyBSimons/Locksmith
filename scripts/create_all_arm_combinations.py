@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-Compute all possible forward and reverse primers.
+#Compute all possible forward and reverse primers.
 import os
 from argparse import ArgumentParser
 import json
