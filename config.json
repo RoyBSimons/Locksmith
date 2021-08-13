@@ -1,15 +1,16 @@
 {
     "cpg_bed_path" : "data/CpG_bed_nomenclature/CpG_hg19_chr*",
     "target_range" : "100",
-    "SNP_frequency_threshold" : "0.5",
+    "SNP_frequency_threshold" : "0.01",
     "probe_specifics": [
 	    {
 		    "min_arm_length": 18,
 		    "max_arm_length": 23,
-		    "min_target_length": 30,
+		    "min_target_length": 45,
 		    "max_target_length": 50,
 		    "cpg_flanks": 5,
-		    "preferred_tm": 50
+		    "preferred_tm": 50,
+		    "max_cpgs_in_arms": 1
 	    }
 	]
 }

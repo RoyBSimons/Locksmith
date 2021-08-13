@@ -1,8 +1,8 @@
 configfile: "config.json"
-
 rule all:
 	input:
-		expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,1])		
+		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])
+	
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
