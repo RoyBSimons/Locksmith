@@ -16,6 +16,8 @@ parser.add_argument("-t", "--target_file", dest="target_file",
                     help="target_file", metavar="TARGET_FILE")
 parser.add_argument("-n", "--output_not_selected", dest="outputname_not_selected",
                     help="write report to FILE", metavar="OUTPUTFILE_NOT_SELECTED")
+parser.add_argument("-y", "--iteration", dest="iteration",
+                    help="input value of iteration", metavar="ITERATION")
 
 args = vars(parser.parse_args())
 
@@ -24,6 +26,7 @@ outputname=args["outputname"]
 config_file=args["config_file"]
 target_file=args["target_file"]
 outputname_not_selected=args["outputname_not_selected"]
+iteration=int(args["iteration"])
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
     jsonFile.close()
@@ -46,6 +49,7 @@ with open(filename) as handle:
         if cpg_id==last_cpg_id or i==0:
             arm_list.append(row)
             tm_list.append(delta_tm)
+            cpg_list.append(cpg_id)
         else:
             #find best arm from previous loop
             index=min(enumerate(tm_list),key=itemgetter(1))[0]
@@ -59,12 +63,21 @@ with open(filename) as handle:
 #Also select the arms for the last CpG
 index=min(enumerate(tm_list),key=itemgetter(1))[0]
 selected_arms.append(arm_list[index]) #select the arms with the lowest Tm
-cpg_list.append(cpg_id)
 
 with open(outputname, "w") as handle:
     writer=csv.writer(handle, delimiter="\t")
     for row in selected_arms:
         writer.writerow(row)
+
+
+for i in range(0,iteration):
+    previous_selected_cg_ids=[]
+    previous_selected_filename="output/iteration_"+str(i)+"/selected_arms_"+str(i)+".tsv"
+    with open(previous_selected_filename) as handle:
+        reader=csv.reader(handle,delimiter='\t')
+        for row in reader:
+            cpg_id=row[4].split('_')[0]
+            cpg_list.append(cpg_id)
 
 cpg_target_list=[]
 #Return a file with all of the CpG_id's for which no arms were selected.

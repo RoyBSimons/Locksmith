@@ -2,8 +2,7 @@ configfile: "config.json"
 
 rule all:
 	input:
-		"output/selected_arms.tsv"
-
+		expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,1])		
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -124,33 +123,37 @@ rule report_SNP_and_CpG_in_arms:
 		cpg_down="output/all_arms_downstream_cpg.bed",
 		snp_up="output/all_arms_upstream_snp.bed",
 		snp_down="output/all_arms_downstream_snp.bed",
-		arms="output/cpg_snp_free_arms.tsv"
+		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv"
+	params:
+		value='{iteration}',
+		iteration='{iteration}'
+
 	shell:
 		"bedtools intersect -a {input.up} -b {config[cpg_bed_path]} -c > {output.cpg_up} && "
 		"bedtools intersect -a {input.down} -b {config[cpg_bed_path]} -c > {output.cpg_down} && "
                 "bedtools intersect -a {input.up} -b {input.snp} -c > {output.snp_up} && "
                 "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
-		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms}"
+		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms} -l {params.value}"
 		
 #---------------------------------------------------------------------------------------------------
 #STEP 5
 rule Obtain_Tm_arms:
 	input:
-		"output/cpg_snp_free_arms.tsv"
+		"output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
 	output:
-		up="output/arms_tm_upstream.txt",
-		down="output/arms_tm_downstream.txt"
+		up="output/iteration_{iteration}/arms_tm_upstream_{iteration}.txt",
+		down="output/iteration_{iteration}/arms_tm_downstream_{iteration}.txt"
 	shell:
 		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.down} && """
 		"""while IFS= read -r line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.up}"""
 
 rule Add_Tm_arms:
 	input:
-		up="output/arms_tm_upstream.txt",
-		down="output/arms_tm_downstream.txt",
-		arms="output/cpg_snp_free_arms.tsv"
+		up="output/iteration_{iteration}/arms_tm_upstream_{iteration}.txt",
+		down="output/iteration_{iteration}/arms_tm_downstream_{iteration}.txt",
+		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
 	output:
-		"output/cpg_snp_free_arms_tm.tsv"
+		"output/iteration_{iteration}/cpg_snp_{iteration}_arms_tm.tsv"
 	shell:
 		"python scripts/add_tm_to_arms.py -i {input.arms} -o {output} -d {input.down} -u {input.up}"
 		
@@ -158,11 +161,48 @@ rule Add_Tm_arms:
 #STEP 6
 rule Select_arms:
 	input:
-		arms="output/cpg_snp_free_arms_tm.tsv",
+		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms_tm.tsv",
 		config_file="config.json",
 		target="data/target_list.bed"
+
 	output:
-		selected="output/selected_arms.tsv",
-		not_selected="output/not_selected_arms.tsv"
+		selected="output/iteration_{iteration}/selected_arms_{iteration}.tsv",
+		not_selected="output/iteration_{iteration}/not_selected_arms_{iteration}.tsv"
+	params:
+		iteration='{iteration}'
 	shell:
-		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target}"
+		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration}"
+
+def get_correct_wildcard(name):
+	iteration_nr=int(name[2:-2])
+	if iteration_nr== 0:
+		output_value='test'
+	elif iteration_nr == 1:
+		output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
+	else:
+		output_value='test'	
+	return output_value
+
+rule Select_arms_iterative:
+	input:
+		non=lambda wildcards: get_correct_wildcard('{iterations_nr}'.format(iterations_nr={wildcards.iteration})),
+		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv"
+	output:
+		"output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
+	shell:
+		"python scripts/choose_arms_for_iteration.py -i {input.arms} -n {input.non} -o {output}"
+
+rule test_file:
+	input:
+	output:
+		'test'
+	shell:
+		'echo > {output}'
+#rule Combine_selected_arms:
+#	input: 
+#		#all selected_arms files
+#
+#	output:
+#		"output/selected_arms_combined.tsv"
+#	shell:
+#

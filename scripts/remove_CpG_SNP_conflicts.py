@@ -19,7 +19,8 @@ parser.add_argument("-s", "--input_SNP_up", dest="inputname_SNP_up",
                     help="write report to FILE", metavar="INPUTFILESNP_UP")
 parser.add_argument("-t", "--intput_SNP_down", dest="inputname_SNP_down",
                     help="write report to FILE", metavar="INPUTFILESNP_DOWN")
-
+parser.add_argument("-l", "--number_of_iteration", dest="iteration",
+                    help="The number of wanted CpGs in arms", metavar="ITERATION")
 
 
 args = vars(parser.parse_args())
@@ -30,6 +31,7 @@ inputname_up=args["inputname_up"]
 inputname_down=args["inputname_down"]
 inputname_SNP_up=args["inputname_SNP_up"]
 inputname_SNP_down=args["inputname_SNP_down"]
+iteration=int(args["iteration"])
 
 cpg_list_up=[]
 cpg_list_down=[]
@@ -65,7 +67,7 @@ with open(outputname,"w") as handle:
     with open(filename) as handle:
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
-            if combined_cpg_snp_list[i] == 0:
+            if combined_cpg_snp_list[i] == iteration:
                 outputfile.writerow(row)
             else:
                 pass
