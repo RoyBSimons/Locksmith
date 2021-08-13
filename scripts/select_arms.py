@@ -64,9 +64,11 @@ with open(filename) as handle:
 index=min(enumerate(tm_list),key=itemgetter(1))[0]
 selected_arms.append(arm_list[index]) #select the arms with the lowest Tm
 
+#Write a file returning the selected arms
 with open(outputname, "w") as handle:
     writer=csv.writer(handle, delimiter="\t")
     for row in selected_arms:
+        row.append(str(iteration))
         writer.writerow(row)
 
 

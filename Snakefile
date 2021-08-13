@@ -1,8 +1,8 @@
 configfile: "config.json"
 rule all:
 	input:
-		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])
-	
+		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms']),
+		"output/selected_arms_combined.tsv"			
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -198,11 +198,11 @@ rule Initialize_arm_selection:
 		'output/Arm_selection_initialization_file'
 	shell:
 		'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
-#rule Combine_selected_arms:
-#	input: 
-#		#all selected_arms files
-#
-#	output:
-#		"output/selected_arms_combined.tsv"
-#	shell:
-#
+rule Combine_selected_arms:
+	input: 
+		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])		
+	output:
+		"output/selected_arms_combined.tsv"
+	shell:
+		'cat output/iteration_*/selected* > {output}'
+
