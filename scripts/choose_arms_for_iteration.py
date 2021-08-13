@@ -18,7 +18,7 @@ filename=args["filename"]
 outputname=args["outputname"]
 inputname_not_selected=args["inputname_not_selected"]
 
-if inputname_not_selected == 'test':
+if inputname_not_selected == 'output/Arm_selection_initialization_file':
     with open(outputname, 'w') as handle:
         writer=csv.writer(handle)
         with open(filename) as handle2:
@@ -41,7 +41,6 @@ else:
             cpg_id_list.append(CpG_id)
             arm_list.append(row)
     
-    print(cpg_list_non_selected)
     Boolean_list=[cpg in cpg_list_non_selected for cpg in cpg_id_list]
     selected_arms=list(compress(arm_list,Boolean_list))
     

@@ -176,11 +176,11 @@ rule Select_arms:
 def get_correct_wildcard(name):
 	iteration_nr=int(name[2:-2])
 	if iteration_nr== 0:
-		output_value='test'
+		output_value='output/Arm_selection_initialization_file'
 	elif iteration_nr == 1:
 		output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
 	else:
-		output_value='test'	
+		output_value='output/Arm_selection_initialization_file'	
 	return output_value
 
 rule Select_arms_iterative:
@@ -192,12 +192,12 @@ rule Select_arms_iterative:
 	shell:
 		"python scripts/choose_arms_for_iteration.py -i {input.arms} -n {input.non} -o {output}"
 
-rule test_file:
+rule Initialize_arm_selection:
 	input:
 	output:
-		'test'
+		'output/Arm_selection_initialization_file'
 	shell:
-		'echo > {output}'
+		'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
 #rule Combine_selected_arms:
 #	input: 
 #		#all selected_arms files
