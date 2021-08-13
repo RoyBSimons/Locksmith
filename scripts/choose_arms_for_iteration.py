@@ -31,7 +31,7 @@ else:
         reader=csv.reader(handle)
         for row in reader:
             cpg_list_non_selected.append(row[0])
-    
+        
     cpg_id_list=[]
     arm_list=[]
     with open(filename) as handle:
@@ -41,8 +41,8 @@ else:
             cpg_id_list.append(CpG_id)
             arm_list.append(row)
     
-    
-    Boolean_list=[True for cpg in cpg_id_list if cpg in cpg_list_non_selected]
+    print(cpg_list_non_selected)
+    Boolean_list=[cpg in cpg_list_non_selected for cpg in cpg_id_list]
     selected_arms=list(compress(arm_list,Boolean_list))
     
     
