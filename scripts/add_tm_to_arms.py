@@ -21,8 +21,8 @@ outputname=args["outputname"]
 inputname_up=args["inputname_up"]
 inputname_down=args["inputname_down"]
 
-tm_up=[0]
-tm_down=[0]
+tm_up=[]
+tm_down=[]
 
 with open(inputname_up) as handle:
     reader=csv.reader(handle)

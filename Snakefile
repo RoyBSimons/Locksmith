@@ -1,8 +1,7 @@
 configfile: "config.json"
 rule all:
 	input:
-		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])
-	
+		"output/probes.fasta"			
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -144,8 +143,10 @@ rule Obtain_Tm_arms:
 		up="output/iteration_{iteration}/arms_tm_upstream_{iteration}.txt",
 		down="output/iteration_{iteration}/arms_tm_downstream_{iteration}.txt"
 	shell:
-		"""while IFS= read -r line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.down} && """
-		"""while IFS= read -r line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do ../primer3/src/oligotm $SEQ ; done ; done <"{input}" > {output.up}"""
+		"""oligotm $(head {input} -n 1 | awk "{{print \$1}}") > {output.down} &&"""
+                """oligotm $(head {input} -n 1 | awk "{{print \$2}}") > {output.up} &&"""
+		"""while IFS= read line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.down} & """
+		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up}"""
 
 rule Add_Tm_arms:
 	input:
@@ -177,10 +178,8 @@ def get_correct_wildcard(name):
 	iteration_nr=int(name[2:-2])
 	if iteration_nr== 0:
 		output_value='output/Arm_selection_initialization_file'
-	elif iteration_nr == 1:
-		output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
 	else:
-		output_value='output/Arm_selection_initialization_file'	
+		output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
 	return output_value
 
 rule Select_arms_iterative:
@@ -198,11 +197,23 @@ rule Initialize_arm_selection:
 		'output/Arm_selection_initialization_file'
 	shell:
 		'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
-#rule Combine_selected_arms:
-#	input: 
-#		#all selected_arms files
-#
-#	output:
-#		"output/selected_arms_combined.tsv"
-#	shell:
-#
+rule Combine_selected_arms:
+	input: 
+		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])		
+	output:
+		"output/selected_arms_combined.tsv"
+	shell:
+		'cat output/iteration_*/selected* > {output}'
+#---------------------------------------------------------------------------------------------------
+#STEP 7
+rule Create_probes:
+	input:
+		"output/selected_arms_combined.tsv"
+	output:
+		"output/probes.fasta"
+	shell:
+		"python scripts/Add_backbone.py -i {input} -c {config[Backbone_sequence]} -o {output}"
+		
+#---------------------------------------------------------------------------------------------------
+#STEP 8
+
