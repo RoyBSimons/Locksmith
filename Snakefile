@@ -1,12 +1,7 @@
 configfile: "config.json"
 rule all:
 	input:
-<<<<<<< HEAD
 		"output/probes.fasta"			
-=======
-		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms']),
-		"output/selected_arms_combined.tsv"			
->>>>>>> e95865d0de039a6bddc3e33a2d7c0237d27bf244
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -209,7 +204,6 @@ rule Combine_selected_arms:
 		"output/selected_arms_combined.tsv"
 	shell:
 		'cat output/iteration_*/selected* > {output}'
-<<<<<<< HEAD
 #---------------------------------------------------------------------------------------------------
 #STEP 7
 rule Create_probes:
@@ -222,6 +216,5 @@ rule Create_probes:
 		
 #---------------------------------------------------------------------------------------------------
 #STEP 8
-=======
->>>>>>> e95865d0de039a6bddc3e33a2d7c0237d27bf244
+
 
