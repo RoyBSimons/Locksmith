@@ -1,5 +1,6 @@
 {
     "cpg_bed_path" : "data/CpG_bed_nomenclature/CpG_hg19_chr*",
+    "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg19/hg19_split/",
     "target_range" : "100",
     "SNP_frequency_threshold" : "0.01",
     "Backbone_sequence" : "CTTAGGCTGGATCTTCTCCCGCGAATTTTAACCCTCACCAACTACGAGAT",

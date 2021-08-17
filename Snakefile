@@ -1,7 +1,8 @@
 configfile: "config.json"
 rule all:
 	input:
-		"output/probes.fasta"			
+		"output/probes.fasta",
+		"output/probe_QC"
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -216,5 +217,13 @@ rule Create_probes:
 		
 #---------------------------------------------------------------------------------------------------
 #STEP 8
-
-
+rule probe_QC_by_MFEprimer:
+	input:
+		"output/probes.fasta"
+	output:
+		"output/probe_QC"
+	shell:
+		"db_caller='' &&"
+		"databases={config[PATH_to_genome_database_directory]}*.fa &&"
+		"for file in $databases; do db_caller=$db_caller'-d '$file' ' ; done &&"
+		"mfeprimer -i {input} -o {output} $db_caller"
