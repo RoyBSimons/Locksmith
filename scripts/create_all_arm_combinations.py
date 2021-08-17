@@ -4,6 +4,7 @@ import os
 from argparse import ArgumentParser
 import json
 from Bio import SeqIO, Seq
+from Bio.SeqUtils import GC
 import subprocess
 
 parser = ArgumentParser()
@@ -41,7 +42,8 @@ min_target_length=probe_specifics['min_target_length']
 max_target_length=probe_specifics['max_target_length']
 target_range=configObject['target_range']
 cpg_flanks=probe_specifics['cpg_flanks']
-
+max_CG_percentage=float(probe_specifics['max_CG_percentage'])
+min_CG_percentage=float(probe_specifics['min_CG_percentage'])
 
 mid_loc=int(target_range)+1 #The middle nucleotide is the target range +1 because the total target is created by adding the target range on both sides.
 
@@ -71,31 +73,27 @@ with open(outputname, 'w') as handle:
                     end_loc_downstream=mid_loc-cpg_flanks
                     for start_loc in range(start_loc_downstream,end_loc_downstream):
                         start_loc_upstream=start_loc+target_length
+                        new_d_arm=record.seq[start_loc-arm_length_downstream:start_loc]
+                        if GC(new_d_arm)> max_CG_percentage or GC(new_d_arm)<min_CG_percentage:
+                            break
+                        else:
+                            pass
+                        downstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-arm_length_downstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-1)
                         for arm_length_upstream in range(min_arm_length,max_arm_length+1):
-                            new_d_arm=record.seq[start_loc-arm_length_downstream:start_loc]
-                            downstream_arms.append(new_d_arm)
-                            downstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-arm_length_downstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-1)
-                            downstream_ids.append(downstream_id)
-                            #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_d_arm),shell=True, stdout=subprocess.PIPE)
-                            #oligo_tm_d=proc.communicate()[0]
-                            #downstream_tm.append(oligo_tm_d)
                             new_u_arm=record.seq[start_loc_upstream:start_loc_upstream+arm_length_upstream]
-                            upstream_arms.append(new_u_arm)
+                            if GC(new_u_arm)> max_CG_percentage or GC(new_d_arm)<min_CG_percentage:
+                                break
+                            else:
+                                pass
                             upstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
+                            downstream_arms.append(new_d_arm)
+                            downstream_ids.append(downstream_id)
+                            upstream_arms.append(new_u_arm)
                             upstream_ids.append(upstream_id)
                             target_length_list.append(target_length)
                             record_list.append(record.id)
                             arm_nr_list.append(i)
                             i+=1
-                            #proc=subprocess.Popen("~/opt/primer3/src/oligotm "+str(new_u_arm),shell=True, stdout=subprocess.PIPE)
-                            #oligo_tm_u=proc.communicate()[0]
-                            #upstream_tm.append(oligo_tm_u)
-#                            outputfile.writerow([new_u_arm,new_d_arm,upstream_id,downstream_id,target_length])
-                            #outputfile.writerow([new_u_arm,new_d_arm,oligo_tm_u,oligo_tm_d,record.id,target_length]) 
-#with open(outputname, 'w') as handle:
-#    outputfile=csv.writer(handle, delimiter="\t")
-#    for i,row in enumerate(upstream_arms):
-#        outputfile.writerow([row,downstream_arms[i],upstream_tm[i],downstream_tm[i],record_list[i],target_length_list[i]])
 cg_id_list_in=[]
 record_id_list_in=[]
 with open(bedfile) as handle:

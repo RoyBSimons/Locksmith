@@ -146,8 +146,9 @@ rule Obtain_Tm_arms:
 	shell:
 		"""oligotm $(head {input} -n 1 | awk "{{print \$1}}") > {output.down} &&"""
                 """oligotm $(head {input} -n 1 | awk "{{print \$2}}") > {output.up} &&"""
-		"""while IFS= read line; do seq=$(awk "{{print \$1}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.down} & """
-		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up}"""
+		"""while IFS= read line; do seq_down=$(awk "{{print \$1}}"); for SEQ_DOWN in $seq_down; do oligotm $SEQ_DOWN &  done ; done <"{input}" >> {output.down} & """
+		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up} &"""
+		"wait"
 
 rule Add_Tm_arms:
 	input:
