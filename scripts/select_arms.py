@@ -40,6 +40,7 @@ cpg_list=[]
 last_cpg_id=0
 selected_arms=[]
 with open(filename) as handle:
+    header=handle.readline().rstrip('\n').split('\t')
     reader=csv.reader(handle,delimiter="\t")
     for i,row in enumerate(reader):
         cpg_id=row[4].split("_")[0]
@@ -70,6 +71,8 @@ else:
 #Write a file returning the selected arms
 with open(outputname, "w") as handle:
     writer=csv.writer(handle, delimiter="\t")
+    header.append('iteration')
+    writer.writerow(header)
     for row in selected_arms:
         row.append(str(iteration))
         writer.writerow(row)

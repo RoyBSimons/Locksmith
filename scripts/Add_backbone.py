@@ -24,6 +24,7 @@ Backbone_sequence=args["Backbone_sequence"]
 
 probe_list=[]
 with open(filename) as handle:
+    handle.readline().rstrip('\n').split('\t')
     reader=csv.reader(handle,delimiter='\t')
     for row in reader:
         upstream_arm=row[1]

@@ -135,6 +135,30 @@ rule report_SNP_and_CpG_in_arms:
                 "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
 		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms} -l {params.value}"
 		
+def get_correct_wildcard(name):
+        iteration_nr=int(name[2:-2])
+        if iteration_nr== 0:
+                output_value='output/Arm_selection_initialization_file'
+        else:
+                output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
+        return output_value
+
+rule Initialize_arm_selection:
+        input:
+        output:
+                'output/Arm_selection_initialization_file'
+        shell:
+                'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
+
+rule Select_arms_iterative: #This rule only keeps the arms from "output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv" which are not yet selected by previous iterations
+        input:
+                non=lambda wildcards: get_correct_wildcard('{iterations_nr}'.format(iterations_nr={wildcards.iteration})),
+                arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv"
+        output:
+                "output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
+        shell:
+                "python scripts/choose_arms_for_iteration.py -i {input.arms} -n {input.non} -o {output}"
+
 #---------------------------------------------------------------------------------------------------
 #STEP 5
 rule Obtain_Tm_arms:
@@ -144,11 +168,19 @@ rule Obtain_Tm_arms:
 		up="output/iteration_{iteration}/arms_tm_upstream_{iteration}.txt",
 		down="output/iteration_{iteration}/arms_tm_downstream_{iteration}.txt"
 	shell:
-		"""oligotm $(head {input} -n 1 | awk "{{print \$1}}") > {output.down} &&"""
-                """oligotm $(head {input} -n 1 | awk "{{print \$2}}") > {output.up} &&"""
-		"""while IFS= read line; do seq_down=$(awk "{{print \$1}}"); for SEQ_DOWN in $seq_down; do oligotm $SEQ_DOWN &  done ; done <"{input}" >> {output.down} & """
-		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up} &"""
-		"wait"
+#		"""oligotm $(head {input} -n 1 | awk "{{print \$1}}") > {output.down} &&"""
+#               """oligotm $(head {input} -n 1 | awk "{{print \$2}}") > {output.up} &&"""
+#		"""while IFS= read line; do seq_down=$(awk "{{print \$1}}"); for SEQ_DOWN in $seq_down; do oligotm $SEQ_DOWN &  done ; done <"{input}" >> {output.down} & """
+#		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up} &"""
+#		"wait"
+		"""seq_list_down="" &&"""
+		""" seq_list_up="" &&"""
+		""" while IFS= read line; do seq_list_down=$seq_list_down$(awk "{{print \$1}}"); done < "{input}" &&"""
+		""" while IFS= read line; do seq_list_up=$seq_list_up$(awk "{{print \$2}}"); done < "{input}" &&"""
+		""" lines_in_file=$(wc -l <{input}) &&"""
+		"""if [ $lines_in_file -gt 1 ]; then parallel -k oligotm ::: $seq_list_down >> {output.down} &&  parallel -k oligotm ::: $seq_list_up >> {output.up}; else echo No Tms are obtained as there are no arms in the input file && touch {output.down} && touch {output.up}; fi; """
+#		""" parallel -k oligotm ::: $seq_list_down >> {output.down} &&"""
+#		""" parallel -k oligotm ::: $seq_list_up >> {output.up}"""
 
 rule Add_Tm_arms:
 	input:
@@ -176,36 +208,13 @@ rule Select_arms:
 	shell:
 		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration}"
 
-def get_correct_wildcard(name):
-	iteration_nr=int(name[2:-2])
-	if iteration_nr== 0:
-		output_value='output/Arm_selection_initialization_file'
-	else:
-		output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
-	return output_value
-
-rule Select_arms_iterative:
-	input:
-		non=lambda wildcards: get_correct_wildcard('{iterations_nr}'.format(iterations_nr={wildcards.iteration})),
-		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv"
-	output:
-		"output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
-	shell:
-		"python scripts/choose_arms_for_iteration.py -i {input.arms} -n {input.non} -o {output}"
-
-rule Initialize_arm_selection:
-	input:
-	output:
-		'output/Arm_selection_initialization_file'
-	shell:
-		'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
 rule Combine_selected_arms:
 	input: 
 		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])		
 	output:
 		"output/selected_arms_combined.tsv"
 	shell:
-		'cat output/iteration_*/selected* > {output}'
+		"awk 'FNR==1 && NR!=1{{next;}}{{print}}' output/iteration_*/selected* > {output}"
 #---------------------------------------------------------------------------------------------------
 #STEP 7
 rule Create_probes:

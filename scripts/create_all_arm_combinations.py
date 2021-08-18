@@ -108,6 +108,7 @@ for record_id in record_list:
 
 with open(outputname, 'w') as handle:
     outputfile=csv.writer(handle, delimiter="\t")
+    outputfile.writerow(['#Upstream_arm','downstream_arm','upstream_loc','downstream_loc','cg_id+arms_id','target_length'])
     for i,upstream_arm in enumerate(upstream_arms):
         outputfile.writerow([upstream_arm,downstream_arms[i],upstream_ids[i],downstream_ids[i],cg_id_list[i]+"_arm_"+str(arm_nr_list[i]),target_length_list[i]])
 

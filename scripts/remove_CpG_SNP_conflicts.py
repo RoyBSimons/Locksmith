@@ -65,6 +65,8 @@ combined_cpg_snp_list=list(map(operator.add,list(map(operator.add,cpg_list_up,cp
 with open(outputname,"w") as handle:
     outputfile=csv.writer(handle,delimiter="\t")
     with open(filename) as handle:
+        header=handle.readline().rstrip('\n').split("\t")
+        outputfile.writerow(header)
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
             if combined_cpg_snp_list[i] == iteration:

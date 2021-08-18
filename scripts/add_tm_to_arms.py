@@ -37,6 +37,10 @@ with open(inputname_down) as handle:
 with open(outputname, "w") as handle_out:
     outputfile=csv.writer(handle_out,delimiter="\t")
     with open(filename) as handle:
+        header=handle.readline().rstrip('\n').split('\t')
+        header.append('tm_down')
+        header.append('tm_up')
+        outputfile.writerow(header)
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
             row.append(tm_down[i])

@@ -20,9 +20,11 @@ inputname_not_selected=args["inputname_not_selected"]
 
 if inputname_not_selected == 'output/Arm_selection_initialization_file':
     with open(outputname, 'w') as handle:
-        writer=csv.writer(handle)
+        writer=csv.writer(handle,delimiter='\t')
         with open(filename) as handle2:
-            reader=csv.reader(handle2)
+            header=handle2.readline().rstrip('\n').split('\t')
+            writer.writerow(header)
+            reader=csv.reader(handle2,delimiter='\t')
             for row in reader:
                 writer.writerow(row)
 else:
@@ -35,6 +37,7 @@ else:
     cpg_id_list=[]
     arm_list=[]
     with open(filename) as handle:
+        header=handle.readline().rstrip('\n').split('\t')
         reader=csv.reader(handle,delimiter='\t')
         for row in reader:
             CpG_id=row[-2].split('_')[0]
@@ -47,6 +50,7 @@ else:
     
     with open(outputname, "w") as handle:
         writer=csv.writer(handle, delimiter="\t")
+        writer.writerow(header)
         for row in selected_arms:
             writer.writerow(row)
 
