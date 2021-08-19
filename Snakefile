@@ -3,6 +3,8 @@ rule all:
 	input:
 		"output/probes.fasta",
 		"output/probe_QC"
+	shell:
+		"cp config.json output/config.json"
 #---------------------------------------------------------------------------------------------------
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
@@ -178,7 +180,7 @@ rule Obtain_Tm_arms:
 		""" while IFS= read line; do seq_list_down=$seq_list_down$(awk "{{print \$1}}"); done < "{input}" &&"""
 		""" while IFS= read line; do seq_list_up=$seq_list_up$(awk "{{print \$2}}"); done < "{input}" &&"""
 		""" lines_in_file=$(wc -l <{input}) &&"""
-		"""if [ $lines_in_file -gt 1 ]; then parallel -k oligotm ::: $seq_list_down >> {output.down} &&  parallel -k oligotm ::: $seq_list_up >> {output.up}; else echo No Tms are obtained as there are no arms in the input file && touch {output.down} && touch {output.up}; fi; """
+		"""if [ $lines_in_file -gt 1 ]; then echo $seq_list_down | xargs parallel -k -j 400 oligotm ::: >> {output.down} &&  echo $seq_list_up | xargs parallel -k -j 400 oligotm ::: >> {output.up}; else echo No Tms are obtained as there are no arms in the input file && touch {output.down} && touch {output.up}; fi; """
 #		""" parallel -k oligotm ::: $seq_list_down >> {output.down} &&"""
 #		""" parallel -k oligotm ::: $seq_list_up >> {output.up}"""
 
@@ -236,4 +238,4 @@ rule probe_QC_by_MFEprimer:
 		"db_caller='' &&"
 		"databases={config[PATH_to_genome_database_directory]}*.fa &&"
 		"for file in $databases; do db_caller=$db_caller'-d '$file' ' ; done &&"
-		"mfeprimer -i {input} -o {output} $db_caller"
+		"mfeprimer -i {input} -o {output} --json $db_caller"
