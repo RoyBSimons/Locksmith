@@ -16,5 +16,6 @@
 		    "preferred_tm": 60,
 		    "max_cpgs_in_arms": 2
 	    }
-	]
+	],
+    "Selection_rounds_for_QC": "10"
 }

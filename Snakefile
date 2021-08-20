@@ -1,10 +1,7 @@
 configfile: "config.json"
 rule all:
 	input:
-		"output/probes.fasta",
-		"output/probe_QC_hairpin.json",
-		"output/probe_QC_dimer.json",
-		"output/conflicting_probes_hairpins_dimers.txt"
+		expand("output/selection_{selection_round}/conflicting_probes_hairpins_dimers.txt",selection_round=range(0,int(config["Selection_rounds_for_QC"])))
 	shell:
 		"cp config.json output/config.json"
 #---------------------------------------------------------------------------------------------------
@@ -144,15 +141,21 @@ def get_correct_wildcard(name):
         if iteration_nr== 0:
                 output_value='output/Arm_selection_initialization_file'
         else:
-                output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+".tsv"
+                output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+"_0.tsv"
         return output_value
 
 rule Initialize_arm_selection:
         input:
         output:
-                'output/Arm_selection_initialization_file'
+                iteration_initiation="output/Arm_selection_initialization_file"
         shell:
-                'echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output}'
+                "echo This is an empty file, which fills the place of input.non in the first iteration of arm selection > {output.iteration_initiation}"
+rule Initialize_probe_selection:
+        input:
+        output:
+                selection_initiation="output/probe_selection_initialization_file"
+        shell:
+                "touch {output.selection_initiation}"
 
 rule Select_arms_iterative: #This rule only keeps the arms from "output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv" which are not yet selected by previous iterations
         input:
@@ -172,19 +175,12 @@ rule Obtain_Tm_arms:
 		up="output/iteration_{iteration}/arms_tm_upstream_{iteration}.txt",
 		down="output/iteration_{iteration}/arms_tm_downstream_{iteration}.txt"
 	shell:
-#		"""oligotm $(head {input} -n 1 | awk "{{print \$1}}") > {output.down} &&"""
-#               """oligotm $(head {input} -n 1 | awk "{{print \$2}}") > {output.up} &&"""
-#		"""while IFS= read line; do seq_down=$(awk "{{print \$1}}"); for SEQ_DOWN in $seq_down; do oligotm $SEQ_DOWN &  done ; done <"{input}" >> {output.down} & """
-#		"""while IFS= read line; do seq=$(awk "{{print \$2}}"); for SEQ in $seq; do oligotm $SEQ &  done ; done <"{input}" >> {output.up} &"""
-#		"wait"
 		"""seq_list_down="" &&"""
 		""" seq_list_up="" &&"""
 		""" while IFS= read line; do seq_list_down=$seq_list_down$(awk "{{print \$1}}"); done < "{input}" &&"""
 		""" while IFS= read line; do seq_list_up=$seq_list_up$(awk "{{print \$2}}"); done < "{input}" &&"""
 		""" lines_in_file=$(wc -l <{input}) &&"""
 		"""if [ $lines_in_file -gt 1 ]; then echo $seq_list_down | xargs parallel -k -j 400 oligotm ::: >> {output.down} &&  echo $seq_list_up | xargs parallel -k -j 400 oligotm ::: >> {output.up}; else echo No Tms are obtained as there are no arms in the input file && touch {output.down} && touch {output.up}; fi; """
-#		""" parallel -k oligotm ::: $seq_list_down >> {output.down} &&"""
-#		""" parallel -k oligotm ::: $seq_list_up >> {output.up}"""
 
 rule Add_Tm_arms:
 	input:
@@ -198,34 +194,61 @@ rule Add_Tm_arms:
 		
 #---------------------------------------------------------------------------------------------------
 #STEP 6
+def get_correct_wildcard_selection(name):
+        selection_nr=int(name[2:-2])
+        if selection_nr== 0:
+                output_value="output/probe_selection_initialization_file"
+        else:
+                output_value="output/selection_"+str(selection_nr-1)+"/conflicting_probes_hairpins_dimers.txt"
+        return output_value
+
+def get_correct(name):
+	iteration_nr=int(name.split('_')[0][2:-2])
+	selection_nr=int(name.split('_')[1][2:-2])
+	if iteration_nr== 0:
+		output_value="output/Arm_selection_initialization_file"
+	else:
+		output_value="output/iteration_"+str(iteration_nr-1)+"/selected_arms_"+str(iteration_nr-1)+"_"+str(selection_nr)+".tsv"
+	return output_value
+def get_correct_conflict(name):
+	iteration_nr=int(name.split('_')[0][2:-2])
+	selection_nr=int(name.split('_')[1][2:-2])
+	if selection_nr== 0:
+		output_value="output/Arm_selection_initialization_file"
+	else:
+		output_value="output/selection_"+str(selection_nr-1)+"/conflicting_probes_hairpins_dimers_combined.txt"
+	return output_value
+
 rule Select_arms:
 	input:
 		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms_tm.tsv",
 		config_file="config.json",
-		target="data/target_list.bed"
-
+		target="data/target_list.bed",
+		conflicts=lambda wildcards: get_correct_conflict('{iterations_nr}_{selections_nr}'.format(iterations_nr={wildcards.iteration},selections_nr={wildcards.selection_round})),
+		previous_selected=lambda wildcards: get_correct('{iterations_nr}_{selections_nr}'.format(iterations_nr={wildcards.iteration},selections_nr={wildcards.selection_round}))
 	output:
-		selected="output/iteration_{iteration}/selected_arms_{iteration}.tsv",
-		not_selected="output/iteration_{iteration}/not_selected_arms_{iteration}.tsv"
+		selected="output/iteration_{iteration}/selected_arms_{iteration}_{selection_round}.tsv",
+		not_selected="output/iteration_{iteration}/not_selected_arms_{iteration}_{selection_round}.tsv"
 	params:
-		iteration='{iteration}'
+		iteration='{iteration}',
+		selection_round='{selection_round}'
 	shell:
-		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration}"
+		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration} -d {input.conflicts} -s {params.selection_round}"
 
 rule Combine_selected_arms:
 	input: 
-		expand(expand("output/iteration_{iteration}/selected_arms_{iteration}.tsv",iteration=[0,'{max_iteration}']),max_iteration=config['probe_specifics'][0]['max_cpgs_in_arms'])		
+		expand("output/iteration_{iteration}/selected_arms_{iteration}_{{selection_round}}.tsv",iteration=range(0,1+int(config['probe_specifics'][0]['max_cpgs_in_arms'])))
 	output:
-		"output/selected_arms_combined.tsv"
+		"output/selection_{selection_round}/selected_arms_combined.tsv"
 	shell:
-		"awk 'FNR==1 && NR!=1{{next;}}{{print}}' output/iteration_*/selected* > {output}"
+		"awk 'FNR==1 && NR!=1{{next;}}{{print}}' output/iteration_*/selected*_{wildcards.selection_round}.tsv > {output}"
 #---------------------------------------------------------------------------------------------------
 #STEP 7
 rule Create_probes:
 	input:
-		"output/selected_arms_combined.tsv"
+                "output/selection_{selection_round}/selected_arms_combined.tsv"
 	output:
-		"output/probes.fasta"
+		"output/selection_{selection_round}/probes.fasta"
 	shell:
 		"python scripts/Add_backbone.py -i {input} -c {config[Backbone_sequence]} -o {output}"
 		
@@ -233,10 +256,10 @@ rule Create_probes:
 #STEP 8
 rule probe_QC_by_MFEprimer:
 	input:
-		"output/probes.fasta"
+		"output/selection_{selection_round}/probes.fasta"
 	output:
-		hairpin="output/probe_QC_hairpin.json",
-                dimer="output/probe_QC_dimer.json"
+		hairpin="output/selection_{selection_round}/probe_QC_hairpin.json",
+                dimer="output/selection_{selection_round}/probe_QC_dimer.json"
 	shell:
 #		"db_caller='' &&"
 #		"databases={config[PATH_to_genome_database_directory]}*.fa &&"
@@ -250,9 +273,11 @@ rule probe_QC_by_MFEprimer:
 
 rule Rerun_probes_with_hairpins_or_dimers:
 	input:
-		dimer="output/probe_QC_dimer.json",
-		hairpin="output/probe_QC_hairpin.json"
+		dimer="output/selection_{selection_round}/probe_QC_dimer.json",
+		hairpin="output/selection_{selection_round}/probe_QC_hairpin.json"
 	output:
-		"output/conflicting_probes_hairpins_dimers.txt"
+		conflicts="output/selection_{selection_round}/conflicting_probes_hairpins_dimers.txt",
+		combined="output/selection_{selection_round}/conflicting_probes_hairpins_dimers_combined.txt"
 	shell:
-		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output}"
+		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts} &&"
+		"cat output/selection_*/conflicting_probes_hairpins_dimers.txt > {output.combined}"
