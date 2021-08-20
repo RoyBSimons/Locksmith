@@ -2,7 +2,9 @@ configfile: "config.json"
 rule all:
 	input:
 		"output/probes.fasta",
-		"output/probe_QC"
+		"output/probe_QC_hairpin.json",
+		"output/probe_QC_dimer.json",
+		"output/conflicting_probes_hairpins_dimers.txt"
 	shell:
 		"cp config.json output/config.json"
 #---------------------------------------------------------------------------------------------------
@@ -233,9 +235,24 @@ rule probe_QC_by_MFEprimer:
 	input:
 		"output/probes.fasta"
 	output:
-		"output/probe_QC"
+		hairpin="output/probe_QC_hairpin.json",
+                dimer="output/probe_QC_dimer.json"
 	shell:
-		"db_caller='' &&"
-		"databases={config[PATH_to_genome_database_directory]}*.fa &&"
-		"for file in $databases; do db_caller=$db_caller'-d '$file' ' ; done &&"
-		"mfeprimer -i {input} -o {output} --json $db_caller"
+#		"db_caller='' &&"
+#		"databases={config[PATH_to_genome_database_directory]}*.fa &&"
+#		"for file in $databases; do db_caller=$db_caller'-d '$file' ' ; done &&"
+#		"mfeprimer -i {input} -o {output} --json $db_caller"
+		"outputname_hairpin={output.hairpin} && outputname_without_suffix_hairpin=${{outputname_hairpin:0: -5}} &&"
+                "mfeprimer hairpin -i {input} -o $outputname_without_suffix_hairpin --json &&"
+                "outputname_dimer={output.dimer} && outputname_without_suffix_dimer=${{outputname_dimer:0: -5}} &&"
+                "mfeprimer dimer -i {input} -o $outputname_without_suffix_dimer --json"
+
+
+rule Rerun_probes_with_hairpins_or_dimers:
+	input:
+		dimer="output/probe_QC_dimer.json",
+		hairpin="output/probe_QC_hairpin.json"
+	output:
+		"output/conflicting_probes_hairpins_dimers.txt"
+	shell:
+		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output}"
