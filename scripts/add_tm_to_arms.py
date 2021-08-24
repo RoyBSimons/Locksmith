@@ -3,6 +3,7 @@
 import os
 from argparse import ArgumentParser
 import csv
+import numpy as np
 
 parser = ArgumentParser()
 parser.add_argument("-i", "--input", dest="filename",
@@ -27,13 +28,13 @@ tm_down=[]
 with open(inputname_up) as handle:
     reader=csv.reader(handle)
     for row in reader:
-        tm_up.append(row[0])
+        tm_up.append(float(row[0]))
 
 with open(inputname_down) as handle:
     reader=csv.reader(handle)
     for row in reader:
-        tm_down.append(row[0])
-
+        tm_down.append(float(row[0]))
+#print(np.mean([np.mean(tm_down),np.mean(tm_up)]))
 with open(outputname, "w") as handle_out:
     outputfile=csv.writer(handle_out,delimiter="\t")
     with open(filename) as handle:
@@ -43,6 +44,6 @@ with open(outputname, "w") as handle_out:
         outputfile.writerow(header)
         reader=csv.reader(handle,delimiter="\t")
         for i,row in enumerate(reader):
-            row.append(tm_down[i])
-            row.append(tm_up[i])
+            row.append(str(tm_down[i]))
+            row.append(str(tm_up[i]))
             outputfile.writerow(row)

@@ -136,12 +136,11 @@ rule report_SNP_and_CpG_in_arms:
                 "bedtools intersect -a {input.down} -b {input.snp} -c > {output.snp_down} && "
 		"python scripts/remove_CpG_SNP_conflicts.py -i {input.arms} -u {output.cpg_up} -d {output.cpg_down} -s {output.snp_up} -t {output.snp_down} -o {output.arms} -l {params.value}"
 		
-def get_correct_wildcard(name):
-        iteration_nr=int(name[2:-2])
-        if iteration_nr== 0:
+def get_correct_wildcard(wildcards):
+        if int(wildcards.iteration)== 0:
                 output_value='output/Arm_selection_initialization_file'
         else:
-                output_value="output/iteration_"+str(iteration_nr-1)+"/not_selected_arms_"+str(iteration_nr-1)+"_0.tsv"
+                output_value="output/iteration_"+str(int(wildcards.iteration)-1)+"/not_selected_arms_"+str(int(wildcards.iteration)-1)+"_0.tsv"
         return output_value
 
 rule Initialize_arm_selection:
@@ -159,7 +158,7 @@ rule Initialize_probe_selection:
 
 rule Select_arms_iterative: #This rule only keeps the arms from "output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv" which are not yet selected by previous iterations
         input:
-                non=lambda wildcards: get_correct_wildcard('{iterations_nr}'.format(iterations_nr={wildcards.iteration})),
+                non=lambda wildcards: get_correct_wildcard(wildcards),
                 arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms.tsv"
         output:
                 "output/iteration_{iteration}/cpg_snp_{iteration}_arms_chosen.tsv"
@@ -202,21 +201,17 @@ def get_correct_wildcard_selection(name):
                 output_value="output/selection_"+str(selection_nr-1)+"/conflicting_probes_hairpins_dimers.txt"
         return output_value
 
-def get_correct(name):
-	iteration_nr=int(name.split('_')[0][2:-2])
-	selection_nr=int(name.split('_')[1][2:-2])
-	if iteration_nr== 0:
+def get_correct(wildcards):
+	if int(wildcards.iteration)== 0:
 		output_value="output/Arm_selection_initialization_file"
 	else:
-		output_value="output/iteration_"+str(iteration_nr-1)+"/selected_arms_"+str(iteration_nr-1)+"_"+str(selection_nr)+".tsv"
+		output_value="output/iteration_"+str(int(wildcards.iteration)-1)+"/selected_arms_"+str(int(wildcards.iteration)-1)+"_"+str(int(wildcards.selection_round))+".tsv"
 	return output_value
-def get_correct_conflict(name):
-	iteration_nr=int(name.split('_')[0][2:-2])
-	selection_nr=int(name.split('_')[1][2:-2])
-	if selection_nr== 0:
+def get_correct_conflict(wildcards):
+	if int(wildcards.selection_round)== 0:
 		output_value="output/Arm_selection_initialization_file"
 	else:
-		output_value="output/selection_"+str(selection_nr-1)+"/conflicting_probes_hairpins_dimers_combined.txt"
+		output_value="output/selection_"+str(int(wildcards.selection_round)-1)+"/conflicting_probes_hairpins_dimers_combined.txt"
 	return output_value
 
 rule Select_arms:
@@ -224,8 +219,11 @@ rule Select_arms:
 		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms_tm.tsv",
 		config_file="config.json",
 		target="data/target_list.bed",
-		conflicts=lambda wildcards: get_correct_conflict('{iterations_nr}_{selections_nr}'.format(iterations_nr={wildcards.iteration},selections_nr={wildcards.selection_round})),
-		previous_selected=lambda wildcards: get_correct('{iterations_nr}_{selections_nr}'.format(iterations_nr={wildcards.iteration},selections_nr={wildcards.selection_round}))
+		conflicts=lambda wildcards: get_correct_conflict(wildcards),
+		previous_selected=lambda wildcards: get_correct(wildcards),
+		up="output/iteration_0/arms_tm_upstream_0.txt",
+		down="output/iteration_0/arms_tm_downstream_0.txt"
+
 	output:
 		selected="output/iteration_{iteration}/selected_arms_{iteration}_{selection_round}.tsv",
 		not_selected="output/iteration_{iteration}/not_selected_arms_{iteration}_{selection_round}.tsv"
@@ -233,7 +231,7 @@ rule Select_arms:
 		iteration='{iteration}',
 		selection_round='{selection_round}'
 	shell:
-		"python scripts/select_arms.py -i {input.arms} -c {input.config_file} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration} -d {input.conflicts} -s {params.selection_round}"
+		"python scripts/select_arms.py -i {input.arms} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration} -d {input.conflicts} -s {params.selection_round} -a {input.up} -b {input.down}"
 
 rule Combine_selected_arms:
 	input: 
