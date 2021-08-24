@@ -13,7 +13,6 @@
 		    "min_CG_percentage": 0,
 		    "max_CG_percentage": 100,
 		    "cpg_flanks": 0,
-		    "preferred_tm": 60,
 		    "max_cpgs_in_arms": 2
 	    }
 	],
