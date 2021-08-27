@@ -1,7 +1,7 @@
 configfile: "config.json"
 rule all:
 	input:
-		expand("output/selection_{selection_round}/conflicting_probes_hairpins_dimers.txt",selection_round=range(0,int(config["Selection_rounds_for_QC"])))
+		expand("output/selection_{selection_round}/conflicting_probes_hairpins.tsv",selection_round=range(0,int(config["Selection_rounds_for_QC"])))
 	shell:
 		"cp config.json output/config.json"
 #---------------------------------------------------------------------------------------------------
@@ -207,19 +207,26 @@ def get_correct(wildcards):
 	else:
 		output_value="output/iteration_"+str(int(wildcards.iteration)-1)+"/selected_arms_"+str(int(wildcards.iteration)-1)+"_"+str(int(wildcards.selection_round))+".tsv"
 	return output_value
-def get_correct_conflict(wildcards):
+def get_correct_conflict_hairpins(wildcards):
 	if int(wildcards.selection_round)== 0:
 		output_value="output/Arm_selection_initialization_file"
 	else:
-		output_value="output/selection_"+str(int(wildcards.selection_round)-1)+"/conflicting_probes_hairpins_dimers_combined.txt"
+		output_value="output/selection_"+str(int(wildcards.selection_round)-1)+"/conflicting_probes_hairpins_combined.tsv"
 	return output_value
+def get_correct_conflict_dimers(wildcards):
+        if int(wildcards.selection_round)== 0:
+                output_value="output/Arm_selection_initialization_file"
+        else:
+                output_value="output/selection_"+str(int(wildcards.selection_round)-1)+"/conflicting_probes_dimers_combined.tsv"
+        return output_value
 
 rule Select_arms:
 	input:
 		arms="output/iteration_{iteration}/cpg_snp_{iteration}_arms_tm.tsv",
 		config_file="config.json",
 		target="data/target_list.bed",
-		conflicts=lambda wildcards: get_correct_conflict(wildcards),
+		conflicts_hairpins=lambda wildcards: get_correct_conflict_hairpins(wildcards),
+		conflicts_dimers=lambda wildcards: get_correct_conflict_dimers(wildcards),
 		previous_selected=lambda wildcards: get_correct(wildcards),
 		up="output/iteration_0/arms_tm_upstream_0.txt",
 		down="output/iteration_0/arms_tm_downstream_0.txt"
@@ -231,7 +238,7 @@ rule Select_arms:
 		iteration='{iteration}',
 		selection_round='{selection_round}'
 	shell:
-		"python scripts/select_arms.py -i {input.arms} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration} -d {input.conflicts} -s {params.selection_round} -a {input.up} -b {input.down}"
+		"python scripts/select_arms.py -i {input.arms} -o {output.selected} -n {output.not_selected} -t {input.target} -y {params.iteration} -d {input.conflicts_dimers} -c {input.conflicts_hairpins} -s {params.selection_round} -a {input.up} -b {input.down}"
 
 rule Combine_selected_arms:
 	input: 
@@ -274,8 +281,11 @@ rule Rerun_probes_with_hairpins_or_dimers:
 		dimer="output/selection_{selection_round}/probe_QC_dimer.json",
 		hairpin="output/selection_{selection_round}/probe_QC_hairpin.json"
 	output:
-		conflicts="output/selection_{selection_round}/conflicting_probes_hairpins_dimers.txt",
-		combined="output/selection_{selection_round}/conflicting_probes_hairpins_dimers_combined.txt"
+		conflicts_hairpin="output/selection_{selection_round}/conflicting_probes_hairpins.tsv",
+		conflicts_dimer="output/selection_{selection_round}/conflicting_probes_dimers.tsv",
+		combined_hairpins="output/selection_{selection_round}/conflicting_probes_hairpins_combined.tsv",
+                combined_dimers="output/selection_{selection_round}/conflicting_probes_dimers_combined.tsv"
 	shell:
-		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts} &&"
-		"cat output/selection_*/conflicting_probes_hairpins_dimers.txt > {output.combined}"
+		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts_hairpin} -c {output.conflicts_dimer} &&"
+		"cat output/selection_*/conflicting_probes_hairpins.tsv > {output.combined_hairpins} &&"
+		"cat output/selection_*/conflicting_probes_dimers.tsv > {output.combined_dimers}"

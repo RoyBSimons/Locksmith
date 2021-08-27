@@ -16,7 +16,9 @@ parser.add_argument("-n", "--output_not_selected", dest="outputname_not_selected
                     help="write report to FILE", metavar="OUTPUTFILE_NOT_SELECTED")
 parser.add_argument("-y", "--iteration", dest="iteration",
                     help="input value of iteration", metavar="ITERATION")
-parser.add_argument("-d", "--conflicts", dest="conflicts",
+parser.add_argument("-c", "--conflicts_hairpin", dest="conflicts_hairpin",
+                    help="file containing cpgid+arm_id of probes forming hairpins or dimers", metavar="CONFLICTS")
+parser.add_argument("-d", "--conflicts_dimer", dest="conflicts_dimer",
                     help="file containing cpgid+arm_id of probes forming hairpins or dimers", metavar="CONFLICTS")
 parser.add_argument("-s", "--selection_round", dest="selection_round",
                     help="input value of selection_round", metavar="SELECTION_ROUND")
@@ -31,7 +33,8 @@ target_file=args["target_file"]
 outputname_not_selected=args["outputname_not_selected"]
 iteration=int(args["iteration"])
 selection_round=int(args["selection_round"])
-conflict_file=args["conflicts"]
+conflict_file_hairpin=args["conflicts_hairpin"]
+conflict_file_dimer=args["conflicts_dimer"]
 inputname_up=args["input_up"]
 inputname_down=args["input_down"]
 tm_up=[]
@@ -47,12 +50,18 @@ with open(inputname_down) as handle:
 preferred_tm=np.mean([np.max(tm_down),np.max(tm_up),np.min(tm_down),np.min(tm_up)])
 
 conflicting_cpg_arm_id_list=[]
-
+conflicting_hairpins_start_range=[]
+conflicting_hairpins_end_range=[]
+conflicting_cpg_id_list=[]
 #Construct list of conflicting arms due to hairpins and dimers
-with open(conflict_file) as handle:
-    reader=csv.reader(handle)
+with open(conflict_file_hairpin) as handle:
+    reader=csv.reader(handle,delimiter='\t')
+    handle.readline()
     for row in reader:
         conflicting_cpg_arm_id_list.append(row[0])
+        conflicting_cpg_id_list.append(row[0].split('_')[0])
+        conflicting_hairpins_start_range.append(row[1])
+        conflicting_hairpins_end_range.append(row[2])
 arm_list=[]
 tm_list=[]
 cpg_list=[]
@@ -63,10 +72,53 @@ with open(filename) as handle:
     reader=csv.reader(handle,delimiter="\t")
     for i,row in enumerate(reader):
         cpg_arm_id=row[4]
+        cpg_id=cpg_arm_id.split('_')[0]
         if cpg_arm_id in conflicting_cpg_arm_id_list:
             pass
+        elif cpg_id in conflicting_cpg_id_list:
+            part_of_conflicting_cpg_arm_list=[x for index, x in enumerate(conflicting_cpg_arm_id_list) if x.split('_')[0]==cpg_id]
+            #part_of_conflicting_cpg_arm_list=[conflicting_cpg_arm_id_list[i] for i in indices]
+            for conflicting_cpg_arm_id in list(dict.fromkeys(part_of_conflicting_cpg_arm_list)):#loop over all possible arms that are conflicting (CpG_id_arms)
+                #Add restrictions on which ranges from both arms cannot be combined for hairpins 
+                if conflicting_hairpins_start_range[conflicting_cpg_arm_id_list.index(conflicting_cpg_arm_id)] == 'Outside arm range':
+                    hairpin_region_downstream=0
+                else:
+                    arm_downstream_loc=row[2]
+                    downstream_range=range(int(arm_downstream_loc.split(':')[1].split('-')[0]),int(arm_downstream_loc.split(':')[1].split('-')[1]))
+                    conflict_start_range1=conflicting_hairpins_start_range[conflicting_cpg_arm_id_list.index(conflicting_cpg_arm_id)]
+                    conflict_start_range=range(int(conflict_start_range1.split(':')[1].split('-')[0]),int(conflict_start_range1.split(':')[1].split('-')[1]))
+                    hairpin_region_downstream=len(set(downstream_range).intersection(conflict_start_range))
+                if hairpin_region_downstream>1: #if hairpin region in downstream arm is longer than 5 nucleotides: pass
+                    pass
+                else:
+                    if conflicting_hairpins_end_range[conflicting_cpg_arm_id_list.index(conflicting_cpg_arm_id)] == 'Outside arm range':
+                        hairpin_region_upstream=0
+                    else:
+                        arm_upstream_loc=row[3]
+                        upstream_range=range(int(arm_upstream_loc.split(':')[1].split('-')[0]),int(arm_upstream_loc.split(':')[1].split('-')[1]))
+                        conflict_end_range1=conflicting_hairpins_end_range[conflicting_cpg_arm_id_list.index(conflicting_cpg_arm_id)]
+                        conflict_end_range=range(int(conflict_end_range1.split(':')[1].split('-')[0]),int(conflict_end_range1.split(':')[1].split('-')[1]))
+                        hairpin_region_upstream=len(set(upstream_range).intersection(conflict_end_range))
+                    if hairpin_region_upstream>1: ##if hairpin region in upstream arm is longer than 5 nucleotides: pass
+                            pass
+                    else: #In this situation a new probe will be chosen which has no significant hairpins.
+                        tm_down=float(row[6])
+                        tm_up=float(row[7])
+                        delta_tm_score=abs(preferred_tm-tm_up)**2+abs(preferred_tm-tm_down)**2+abs(tm_up-tm_down)**2
+                        if cpg_id==last_cpg_id or arm_list==[]: #or i ==0
+                            arm_list.append(row)
+                            tm_list.append(delta_tm_score)
+                            cpg_list.append(cpg_id)
+                        else:
+                            #find best arm from previous loop
+                            indexx=min(enumerate(tm_list),key=itemgetter(1))[0]
+                            selected_arms.append(arm_list[indexx]) #select the arms with the lowest Tm
+                            #empty all lists for next loop
+                            arm_list=[row]
+                            tm_list=[delta_tm_score]
+                            cpg_list.append(cpg_id)
+                        last_cpg_id=cpg_id
         else:
-            cpg_id=row[4].split("_")[0]
             tm_down=float(row[6])
             tm_up=float(row[7])
             delta_tm_score=abs(preferred_tm-tm_up)**2+abs(preferred_tm-tm_down)**2+abs(tm_up-tm_down)**2
@@ -76,8 +128,8 @@ with open(filename) as handle:
                 cpg_list.append(cpg_id)
             else:
                 #find best arm from previous loop
-                index=min(enumerate(tm_list),key=itemgetter(1))[0]
-                selected_arms.append(arm_list[index]) #select the arms with the lowest Tm
+                indexx=min(enumerate(tm_list),key=itemgetter(1))[0]
+                selected_arms.append(arm_list[indexx]) #select the arms with the lowest Tm
                 #empty all lists for next loop
                 arm_list=[row]
                 tm_list=[delta_tm_score]
