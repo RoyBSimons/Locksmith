@@ -279,13 +279,14 @@ rule probe_QC_by_MFEprimer:
 rule Rerun_probes_with_hairpins_or_dimers:
 	input:
 		dimer="output/selection_{selection_round}/probe_QC_dimer.json",
-		hairpin="output/selection_{selection_round}/probe_QC_hairpin.json"
+		hairpin="output/selection_{selection_round}/probe_QC_hairpin.json",
+		config="config.json"
 	output:
 		conflicts_hairpin="output/selection_{selection_round}/conflicting_probes_hairpins.tsv",
 		conflicts_dimer="output/selection_{selection_round}/conflicting_probes_dimers.tsv",
 		combined_hairpins="output/selection_{selection_round}/conflicting_probes_hairpins_combined.tsv",
                 combined_dimers="output/selection_{selection_round}/conflicting_probes_dimers_combined.tsv"
 	shell:
-		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts_hairpin} -c {output.conflicts_dimer} &&"
+		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts_hairpin} -c {output.conflicts_dimer} -i {input.config} &&"
 		"cat output/selection_*/conflicting_probes_hairpins.tsv > {output.combined_hairpins} &&"
 		"cat output/selection_*/conflicting_probes_dimers.tsv > {output.combined_dimers}"
