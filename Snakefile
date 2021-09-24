@@ -1,5 +1,5 @@
 configfile: "config.json"
-	rule all:
+rule all:
 	input:
 		expand(config['output_directory']+"/selection_{selection_round}/conflicting_probes_hairpins.tsv",selection_round=range(0,int(config["Selection_rounds_for_QC"])))
 	shell:
@@ -288,5 +288,5 @@ rule Rerun_probes_with_hairpins_or_dimers:
                 combined_dimers=config['output_directory']+"/selection_{selection_round}/conflicting_probes_dimers_combined.tsv"
 	shell:
 		"python scripts/rerun_targets_from_hairpin_and_dimers.py -d {input.dimer} -p {input.hairpin} -o {output.conflicts_hairpin} -c {output.conflicts_dimer} -i {input.config} &&"
-		"cat "config['output_directory']+"/selection_*/conflicting_probes_hairpins.tsv > {output.combined_hairpins} &&"
-		"cat "config['output_directory']+"/selection_*/conflicting_probes_dimers.tsv > {output.combined_dimers}"
+		"cat "+config['output_directory']+"/selection_*/conflicting_probes_hairpins.tsv > {output.combined_hairpins} &&"
+		"cat "+config['output_directory']+"/selection_*/conflicting_probes_dimers.tsv > {output.combined_dimers}"
