@@ -17,8 +17,8 @@ args = vars(parser.parse_args())
 filename=args["filename"]
 outputname=args["outputname"]
 inputname_not_selected=args["inputname_not_selected"]
-
-if inputname_not_selected == 'output/Arm_selection_initialization_file':
+output_dir=outputname.split('/')[0]
+if inputname_not_selected == output_dir+'/Arm_selection_initialization_file':
     with open(outputname, 'w') as handle:
         writer=csv.writer(handle,delimiter='\t')
         with open(filename) as handle2:
