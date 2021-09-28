@@ -166,10 +166,10 @@ with open(outputname, "w") as handle:
         row.append(str(iteration))
         writer.writerow(row)
 
-
+output_dir=outputname.split('/')[0]
 for i in range(0,iteration):
     previous_selected_cg_ids=[]
-    previous_selected_filename="output/iteration_"+str(i)+"/selected_arms_"+str(i)+"_"+str(selection_round)+".tsv"
+    previous_selected_filename=output_dir+"/iteration_"+str(i)+"/selected_arms_"+str(i)+"_"+str(selection_round)+".tsv"
     with open(previous_selected_filename) as handle:
         handle.readline()
         reader=csv.reader(handle,delimiter='\t')

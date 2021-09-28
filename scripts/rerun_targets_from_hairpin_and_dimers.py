@@ -33,7 +33,8 @@ arm_upstream_loc_list=[]
 arm_upstream_list=[]
 arm_downstream_loc_list=[]
 arm_downstream_list=[]
-path='output/iteration_*/cpg_snp_*_arms.tsv'#Open all output/iteration_*/cpg_snp_*_arms.tsv
+output_dir=outputname_dimer.split('/')[0]
+path=output_dir+'/iteration_*/cpg_snp_*_arms.tsv'#Open all output/iteration_*/cpg_snp_*_arms.tsv
 for filename in glob.glob(path):
     with open(filename) as handle:
         handle.readline() #read the header
