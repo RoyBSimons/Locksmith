@@ -7,9 +7,9 @@
     "Backbone_sequence" : "CTTAGGCTGGATCTTCTCCCGCGAATTTTAACCCTCACCAACTACGAGAT",
     "probe_specifics": [
 	    {
-		    "min_arm_length": 18,
+		    "min_arm_length": 23,
 		    "max_arm_length": 23,
-		    "min_target_length": 45,
+		    "min_target_length": 50,
 		    "max_target_length": 50,
 		    "min_CG_percentage": 0,
 		    "max_CG_percentage": 100,
@@ -17,5 +17,5 @@
 		    "max_cpgs_in_arms": 2
 	    }
 	],
-    "Selection_rounds_for_QC": "10"
+    "Permutations": "10"
 }
