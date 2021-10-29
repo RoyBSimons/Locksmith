@@ -158,12 +158,10 @@ def add_backbone(probe_arms,backbone_sequence):
     probe=upstream_arm+backbone_sequence+downstream_arm
     return str(probe)
 
-def check_probe_for_hairpin_score(probe_list,fasta_name,outputname_json):
+def check_probe_for_hairpin_score(probe,fasta_name,outputname_json):
     seq_list=[]
     with open(fasta_name,'w') as output_handle:
-        for i,probe_arms in enumerate(probe_list):
-            for j,probe in enumerate(probe_arms):
-                seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=str(i)+'-'+str(j)))
+        seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id='probe'))
         SeqIO.write(seq_list,output_handle,'fasta')
     os.system('mfeprimer hairpin --in '+fasta_name+' -j -o '+outputname_json) #Remove/move the output files
     with open(outputname_json+'.json') as jsonFile:
@@ -172,17 +170,12 @@ def check_probe_for_hairpin_score(probe_list,fasta_name,outputname_json):
     os.system('rm '+outputname_json+'.json')
     os.system('rm '+outputname_json)
     os.system('rm '+fasta_name)
-    hairpin_scores=[[0 for probe in probe_arms] for probe_arms in probe_list]
     if hairpinlist is None:
-        pass
+        hairpin_score=0
     else:
         for hairpin in hairpinlist:
-            cpg_id=hairpin['Seq']['ID']
-            score=hairpin['Score']
-            i=int(cpg_id.split('-')[0])
-            j=int(cpg_id.split('-')[1])
-            hairpin_scores[i][j]=score
-    return hairpin_scores
+            hairpin_score=hairpin['Score']
+    return hairpin_score
 
 def loci_to_bed_37(locus):#https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt
     chrom=locus.split(':')[0][3:]
@@ -278,11 +271,14 @@ def find_dimer_forming_probes(chosen_probes):
     with open('tmp_dimers_chosen_probes.json') as handle:
         reader = json.load(handle)
         jsonFile.close()
-        for row in reader:
-            index1=int(row['S1']['ID'])
-            dimers[index1]=True
-            index2=int(row['S2']['ID'])
-            dimers[index2]=True
+        if reader==None:
+            pass
+        else:
+            for row in reader:
+                index1=int(row['S1']['ID'])
+                dimers[index1]=True
+                index2=int(row['S2']['ID'])
+                dimers[index2]=True
     #obtain which probes form dimers --> No dimer=False, dimer=True
     return dimers
 #----------------------------------------------------------------------------------------------------------
@@ -306,7 +302,9 @@ pool.close()
 print('\tBackbone added')
 fasta_name='temp_test_fasta.fa'
 outputname_json='temp_test_json'
-hairpin_scores=check_probe_for_hairpin_score(possible_probes_all_targets,fasta_name,outputname_json)
+pool=mp.Pool(nr_of_cores)
+hairpin_scores=[[pool.apply(check_probe_for_hairpin_score,args=(probe,fasta_name,outputname_json)) for probe in possible_probes] for possible_probes in possible_probes_all_targets]
+pool.close()
 print('\tHairpins detected')
 
 SNP_conflicts=obtain_SNPs(possible_arm_combinations_all_targets,bedfile,freq_threshold)
@@ -331,13 +329,14 @@ while counter < permutations:
     print('\tProbes chosen')
     chosen_probes_lists.append(chosen_probes)
     probes_with_dimers=find_dimer_forming_probes(chosen_probes) #function that returns for each chosen probe whether if forms a dimer with one of the other chosen probes
-    probes_with_dimers_lists.append(probes_with_dimers)
     nr_of_dimer_probes=sum(probes_with_dimers)
+    probes_with_dimers_lists.append(nr_of_dimer_probes)
     print('\t'+str(nr_of_dimer_probes)+' probes form a dimer')
     # put the above lines in a function that can be called ~100 times to be able to find the best subset of probes.
     counter+=1
-
-
+chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
+chosen_set=chosen_probes_lists[chosen_set_index]
+#print(chosen_set)
 #print(probes_with_dimers_lists)
 #print(chosen_probes_lists)
 #to write
