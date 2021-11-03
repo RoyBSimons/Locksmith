@@ -12,8 +12,8 @@ from numpy.random import choice
 parser = ArgumentParser()
 parser.add_argument("-i", "--input", dest="filename",
                     help="open FILE", metavar="FILE")
-parser.add_argument("-o", "--output", dest="outputname",
-                    help="write report to FILE", metavar="OUTPUTFILE")
+parser.add_argument("-o", "--output", dest="output_dir",
+                    help="Directory for output", metavar="OUTPUTDIR")
 parser.add_argument("-c", "--config_file", dest="config_file",
                     help="Config file with probe specifics", metavar="JSONfile")
 parser.add_argument("-b", "--bed", dest="bedfile",
@@ -24,7 +24,7 @@ args = vars(parser.parse_args())
 
 filename=args["filename"]
 bedfile=args["bedfile"]
-outputname=args["outputname"]
+outputdir=args["output_dir"]+'/'
 config_file=args["config_file"]
 nr_of_cores=int(args["cores"])
 with open(config_file) as jsonFile:
@@ -158,24 +158,32 @@ def add_backbone(probe_arms,backbone_sequence):
     probe=upstream_arm+backbone_sequence+downstream_arm
     return str(probe)
 
-def check_probe_for_hairpin_score(probe,fasta_name,outputname_json):
+def check_probe_for_hairpin_score(probes,fasta_name,outputname_json,index):
     seq_list=[]
-    with open(fasta_name,'w') as output_handle:
-        seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id='probe'))
+    list_len=len(probes)
+    if list_len == 0: # in case there is no probes
+        return []
+    with open(fasta_name+str(index)+'.fa','w') as output_handle:
+        for i,probe in enumerate(probes):
+            probename=str(i)
+            seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=probename))
         SeqIO.write(seq_list,output_handle,'fasta')
-    os.system('mfeprimer hairpin --in '+fasta_name+' -j -o '+outputname_json) #Remove/move the output files
-    with open(outputname_json+'.json') as jsonFile:
+    os.system('mfeprimer hairpin --in '+fasta_name+str(index)+'.fa -j -o '+outputname_json+str(index)) #Remove/move the output files
+    with open(outputname_json+str(index)+'.json') as jsonFile:
         hairpinlist = json.load(jsonFile)
         jsonFile.close()
-    os.system('rm '+outputname_json+'.json')
-    os.system('rm '+outputname_json)
-    os.system('rm '+fasta_name)
+    os.system('rm '+outputname_json+str(index)+'.json')
+    os.system('rm '+outputname_json+str(index))
+    os.system('rm '+fasta_name+str(index)+'.fa')
+    hairpin_scores=[0 for i in range(list_len)]
     if hairpinlist is None:
-        hairpin_score=0
+        pass
     else:
         for hairpin in hairpinlist:
             hairpin_score=hairpin['Score']
-    return hairpin_score
+            probe_nr=int(hairpin['Seq']['ID'])
+            hairpin_scores[probe_nr]=hairpin_score
+    return hairpin_scores
 
 def loci_to_bed_37(locus):#https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt
     chrom=locus.split(':')[0][3:]
@@ -222,6 +230,7 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
                     else:
                         chr_list.append(chrom)
                         loc_list.append([locus])
+    os.system('rm tmp_output_snp')
     SNP_count=[[0 for probe in probe_arms] for probe_arms in probe_list]
     #first create a bedfile containing each of the arms
     arm1list=[]
@@ -242,7 +251,7 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
     return SNP_count
 
 def get_probe_scores(probe_arms,tms,CpG_conflicts,SNP_conflicts,hairpin_score):
-    probe_score=hairpin_score*10+CpG_conflicts*10+SNP_conflicts*10+tms[2]
+    probe_score=hairpin_score*100+CpG_conflicts*10+SNP_conflicts*10+tms[2]
     return probe_score
 
 def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter):
@@ -279,6 +288,7 @@ def find_dimer_forming_probes(chosen_probes):
                 dimers[index1]=True
                 index2=int(row['S2']['ID'])
                 dimers[index2]=True
+    os.system('rm tmp_dimers_chosen_probes.json')
     #obtain which probes form dimers --> No dimer=False, dimer=True
     return dimers
 #----------------------------------------------------------------------------------------------------------
@@ -300,10 +310,10 @@ pool=mp.Pool(nr_of_cores)
 possible_probes_all_targets=[[pool.apply(add_backbone, args=(probe_arms,backbone_sequence)) for probe_arms in possible_arm_combinations] for possible_arm_combinations in possible_arm_combinations_all_targets]
 pool.close()
 print('\tBackbone added')
-fasta_name='temp_test_fasta.fa'
+fasta_name='temp_test_fasta'
 outputname_json='temp_test_json'
 pool=mp.Pool(nr_of_cores)
-hairpin_scores=[[pool.apply(check_probe_for_hairpin_score,args=(probe,fasta_name,outputname_json)) for probe in possible_probes] for possible_probes in possible_probes_all_targets]
+hairpin_scores=[pool.apply(check_probe_for_hairpin_score,args=(possible_probes,fasta_name,outputname_json,index)) for index,possible_probes in enumerate(possible_probes_all_targets)]
 pool.close()
 print('\tHairpins detected')
 
@@ -316,7 +326,37 @@ pool.close()
 print('\tProbe scores computed')
 
 #print(probe_scores)
+#------------------------------------------------------ Store all information from the prossible probes into files
+with open(outputdir+'possible_arm_combinations_all_targets.csv', 'w') as file:
+    for item in possible_arm_combinations_all_targets:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'tms.csv', 'w') as file:
+    for item in tms:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'CpG_conflicts.csv', 'w') as file:
+    for item in CpG_conflicts:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'possible_probes_all_targets.csv', 'w') as file:
+    for item in possible_probes_all_targets:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'hairpin_scores.csv', 'w') as file:
+    for item in hairpin_scores:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'SNP_conflicts.csv', 'w') as file:
+    for item in SNP_conflicts:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
+with open(outputdir+'probe_scores.csv', 'w') as file:
+    for item in probe_scores:
+            file.write(",".join(map(str,item)))
+            file.write("\n")
 
+#------------------------------------------------------
 counter=0
 chosen_probes_lists=[]
 probes_with_dimers_lists=[]
@@ -336,7 +376,16 @@ while counter < permutations:
     counter+=1
 chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
 chosen_set=chosen_probes_lists[chosen_set_index]
-#print(chosen_set)
+print(chosen_set)
+seq_list=[]
+with open(outputdir+'chosen_probes.fasta','w') as handle:
+    for i,probe in enumerate(chosen_set):
+        if probe == None:
+            pass
+        else:
+            probename=str(i)
+            seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=probename))
+    SeqIO.write(seq_list,handle,'fasta')
 #print(probes_with_dimers_lists)
 #print(chosen_probes_lists)
 #to write
