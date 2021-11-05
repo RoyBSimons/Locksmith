@@ -8,6 +8,7 @@ from Bio.SeqUtils import GC
 import multiprocessing as mp
 import csv
 
+#parse all files
 parser = ArgumentParser()
 parser.add_argument("-i", "--input", dest="filename",
                     help="open FILE", metavar="FILE")
@@ -26,6 +27,8 @@ bedfile=args["bedfile"]
 outputdir=args["output_dir"]+'/'
 config_file=args["config_file"]
 nr_of_cores=int(args["cores"])
+
+#import config file
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
     jsonFile.close()
@@ -39,9 +42,18 @@ target_range=configObject['target_range']
 cpg_flanks=probe_specifics['cpg_flanks']
 max_CG_percentage=float(probe_specifics['max_CG_percentage'])
 min_CG_percentage=float(probe_specifics['min_CG_percentage'])
-backbone_sequence=configObject["Backbone_sequence"]
+
+#patch backbone together
+Backbone=configObject['Backbone_sequence'][0]
+rev_compl_univeral_forward_primer=Backbone['Reverse_complement_universal_forward_primer']
+common_region=Backbone['Common_region']
+univeral_reverse_primer=Backbone['Universal_reverse_primer']
+backbone_sequence=rev_compl_univeral_forward_primer+common_region+univeral_reverse_primer
+
 mid_loc=int(target_range)+1 #The middle nucleotide is the target range +1 because the total target is created by adding the target range on both sides.
 freq_threshold=float(configObject['SNP_frequency_threshold'])
+
+#--------------------------------------------------------------
 def create_all_possible_arms(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_CG_percentage,max_CG_percentage,cpg_flanks,mid_loc):
     probe_list=[]
     i=0

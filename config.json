@@ -4,7 +4,13 @@
     "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg19/hg19_split/",
     "target_range" : "100",
     "SNP_frequency_threshold" : "0.01",
-    "Backbone_sequence" : "CTTAGGCTGGATCTTCTCCCGCGAATTTTAACCCTCACCAACTACGAGAT",
+    "Backbone_sequence" : [
+	    {
+		    Reverse_complement_universal_forward_primer: "CTTAGGCTGGATCTTCTCCC",
+		    Common_region: "GCGAATTTTA",
+		    Universal_reverse_primer: "CTTAGGCTGGATCTTCTCCC"
+	    }
+	],
     "probe_specifics": [
 	    {
 		    "min_arm_length": 23,
