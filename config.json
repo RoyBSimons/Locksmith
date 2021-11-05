@@ -2,6 +2,7 @@
     "output_directory" : "output",
     "cpg_bed_path" : "data/CpG_bed_nomenclature/CpG_hg19_chr*",
     "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg19/hg19_split/",
+    "ftp_path_snp_database" : "ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz",
     "target_range" : "100",
     "SNP_frequency_threshold" : "0.01",
     "Backbone_sequence" : [

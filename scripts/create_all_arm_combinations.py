@@ -32,7 +32,7 @@ nr_of_cores=int(args["cores"])
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
     jsonFile.close()
-
+ftp_path_snp_database=configObject['ftp_path_snp_database']
 probe_specifics=configObject['probe_specifics'][0]
 min_arm_length=probe_specifics['min_arm_length']
 max_arm_length=probe_specifics['max_arm_length']
@@ -221,7 +221,7 @@ def target_bed_to_bed_37(bedpath):
 def obtain_SNPs(probe_list,bedpath,freq_threshold):
     #first obtain frequent SNPs in targets
     new_path=target_bed_to_bed_37(bedpath)
-    os.system('tabix ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz -R '+new_path+' > tmp_output_snp') #put this FTP URL in the config file?
+    os.system('tabix '+ftp_path_snp_database+' -R '+new_path+' > tmp_output_snp') #put this FTP URL in the config file?
     chr_list=[]
     loc_list=[]
     freq_threshold=1.0-freq_threshold
