@@ -7,9 +7,9 @@
     "SNP_frequency_threshold" : "0.01",
     "Backbone_sequence" : [
 	    {
-		    Reverse_complement_universal_forward_primer: "CTTAGGCTGGATCTTCTCCC",
-		    Common_region: "GCGAATTTTA",
-		    Universal_reverse_primer: "CTTAGGCTGGATCTTCTCCC"
+		    "Reverse_complement_universal_forward_primer": "CTTAGGCTGGATCTTCTCCC",
+		    "Common_region": "GCGAATTTTA",
+		    "Universal_reverse_primer": "CTTAGGCTGGATCTTCTCCC"
 	    }
 	],
     "probe_specifics": [
