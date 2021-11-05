@@ -9,10 +9,8 @@ from numpy.random import choice
 import csv
 
 parser = ArgumentParser()
-parser.add_argument("-i", "--input", dest="filename",
-                    help="open FILE", metavar="FILE")
-parser.add_argument("-o", "--output", dest="output_dir",
-                    help="Directory for output", metavar="OUTPUTDIR")
+parser.add_argument("-o", "--output", dest="output_name",
+                    help="Fasta file which will contain the chosen probes as output", metavar="OUTPUTNAME")
 parser.add_argument("-c", "--config_file", dest="config_file",
                     help="Config file with probe specifics", metavar="JSONfile")
 parser.add_argument("-m", "--tms", dest="tms",
@@ -21,7 +19,7 @@ parser.add_argument("-g", "--cpg", dest="cpg",
                     help="csv file containing amount of cpgs in probe arms", metavar="CPG")
 parser.add_argument("-p", "--probes", dest="probes",
                     help="csv file containing the full probes", metavar="PROBES")
-parser.add_argument("-h", "--hairpins", dest="hairpins",
+parser.add_argument("-a", "--hairpins", dest="hairpins",
                     help="csv file containing hairpins of probes", metavar="HAIRPINS")
 parser.add_argument("-n", "--snp", dest="snps",
                     help="csv file containing amount of snps in probe arms", metavar="SNPS")
@@ -32,8 +30,7 @@ parser.add_argument("-t", "--cores", dest="cores",
 
 args = vars(parser.parse_args())
 
-filename=args["filename"]
-outputdir=args["output_dir"]+'/'
+output_name=args["output_name"]
 config_file=args["config_file"]
 tms=args['tms']
 cpgs=args['cpg']
@@ -49,18 +46,18 @@ permutations=int(configObject['Permutations'])
 
 with open(probes, 'r') as handle:
     reader=csv.reader(handle)
-    probe_list=[]
+    possible_probes_all_targets=[]
     for i,row in enumerate(reader):
-        probe_list.append(row[0])
+        possible_probes_all_targets.append([row[0]])
         for probe in row[1:]:
-            probe_list[i].append(probe)
+            possible_probes_all_targets[i].append(probe)
 with open(scores, 'r') as handle:
     reader=csv.reader(handle)
-    scores_list=[]
+    probe_scores=[]
     for i,row in enumerate(reader):
-        scores_list.append(row[0])
+        probe_scores.append([float(row[0])])
         for score in row[1:]:
-            scores_list[i].append(score)
+            probe_scores[i].append(float(score))
 #--------------------------------------------------------
 def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter):
     if possible_arm_combinations==[]:
@@ -124,7 +121,7 @@ chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #
 chosen_set=chosen_probes_lists[chosen_set_index]
 print(chosen_set)
 seq_list=[]
-with open(outputdir+'chosen_probes.fasta','w') as handle:
+with open(output_name,'w') as handle:
     for i,probe in enumerate(chosen_set):
         if probe == None:
             pass

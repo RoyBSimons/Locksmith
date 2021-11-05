@@ -297,10 +297,10 @@ print('\tProbe scores computed')
 
 #print(probe_scores)
 #------------------------------------------------------ Store all information from the prossible probes into files
-with open(outputdir+'possible_arm_combinations_all_targets.csv', 'w') as file:
-    for item in possible_arm_combinations_all_targets:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
+#with open(outputdir+'possible_arm_combinations_all_targets.csv', 'w') as file:
+#    for item in possible_arm_combinations_all_targets:
+#            file.write(",".join(map(str,item)))
+#            file.write("\n")
 with open(outputdir+'tms.csv', 'w') as file:
     for item in tms:
             file.write(",".join(map(str,item)))
