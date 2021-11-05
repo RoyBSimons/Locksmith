@@ -17,5 +17,6 @@
 		    "max_cpgs_in_arms": 2
 	    }
 	],
-    "Permutations": "10"
+    "Permutations": "10",
+    "max_threads": "40"
 }

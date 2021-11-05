@@ -51,10 +51,8 @@ rule create_probes:
                 hairpins=config['output_directory']+"/hairpin_scores.csv",
                 snp=config['output_directory']+"/SNP_conflicts.csv",
                 scores=config['output_directory']+"/probe_scores.csv"
-
-	threads: 20
 	shell:
-		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {threads}"
+		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]}"
 #STEP 3
 rule create_and_choose_panel:
 	input:
@@ -68,6 +66,5 @@ rule create_and_choose_panel:
 		scores=config['output_directory']+"/probe_scores.csv"
 	output:
 		fasta=config['output_directory']+"/chosen_panel.fasta"
-	threads: 20
 	shell:
-		"python scripts/create_and_choose_panel.py -i {input.fasta} -o {config[output_directory]} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -h {input.hairpins} -n {input.snp} -s {input.scores} -t {threads}"
+		"python scripts/create_and_choose_panel.py -i {input.fasta} -o {config[output_directory]} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -h {input.hairpins} -n {input.snp} -s {input.scores} -t {config[max_threads]}"
