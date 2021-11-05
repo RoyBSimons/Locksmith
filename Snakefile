@@ -14,7 +14,7 @@ rule create_bed_file_range:
 
 rule extract_target_sequences:
 	input:
-		genome="data/hg19.fa", #change this to ftp?
+		genome=config['PATH_to_reference_genome_fasta'],
 		bed=config['output_directory']+"/target_list_range.bed"
 	output:
 		config['output_directory']+"/target_sequences.fa"
