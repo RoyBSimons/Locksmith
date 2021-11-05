@@ -38,7 +38,7 @@ rule keep_high_freq_SNP: #Keep the SNPs that have a frequency that is equal or h
 		"python scripts/extract_high_frequent_SNPs.py -i {input} -o {output} -f {config[SNP_frequency_threshold]}"
 #---------------------------------------------------------------------------------------------------
 #STEP 3
-rule create_all_arm_combinations:
+rule create_probes:
 	input:
 		targets=config['output_directory']+"/target_sequences.fa",
 		config_file="config.json",
@@ -55,4 +55,19 @@ rule create_all_arm_combinations:
 	threads: 20
 	shell:
 		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {threads}"
-
+#STEP 3
+rule create_and_choose_panel:
+	input:
+		config_file="config.json",
+		fasta=config['output_directory']+"/chosen_probes.fasta",
+		tms=config['output_directory']+"/tms.csv",
+		cpg=config['output_directory']+"/CpG_conflicts.csv",
+		probes=config['output_directory']+"/possible_probes_all_targets.csv",
+		hairpins=config['output_directory']+"/hairpin_scores.csv",
+		snp=config['output_directory']+"/SNP_conflicts.csv",
+		scores=config['output_directory']+"/probe_scores.csv"
+	output:
+		fasta=config['output_directory']+"/chosen_panel.fasta"
+	threads: 20
+	shell:
+		"python scripts/create_and_choose_panel.py -i {input.fasta} -o {config[output_directory]} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -h {input.hairpins} -n {input.snp} -s {input.scores} -t {threads}"
