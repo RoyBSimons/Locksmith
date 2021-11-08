@@ -25,9 +25,10 @@ parser.add_argument("-n", "--snp", dest="snps",
                     help="csv file containing amount of snps in probe arms", metavar="SNPS")
 parser.add_argument("-s", "--score", dest="scores",
                     help="csv file containing scores of probes", metavar="SCORES")
+parser.add_argument("-r", "--targets", dest="targets",
+                    help="Bedfile containing the targets to capture", metavar="BED")
 parser.add_argument("-t", "--cores", dest="cores",
                     help="Passed amount of cores to script", metavar="Cores")
-
 args = vars(parser.parse_args())
 
 output_name=args["output_name"]
@@ -38,6 +39,7 @@ probes=args['probes']
 hairpins=args['hairpins']
 snps=args['snps']
 scores=args['scores']
+targets=args['targets']
 nr_of_cores=int(args["cores"])
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
@@ -103,31 +105,41 @@ def find_dimer_forming_probes(chosen_probes):
 counter=0
 chosen_probes_lists=[]
 probes_with_dimers_lists=[]
-while counter < permutations:
+min_dimers=len(probe_scores)
+while counter < permutations and min_dimers>0:
     # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
     pool=mp.Pool(nr_of_cores)
     chosen_probes=[]
     chosen_probes=[pool.apply(choose_probes_from_scores,args=(probe_scores[i],possible_arm_combinations,permutations,counter)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the score
     pool.close()
-    print('\tProbes chosen')
+    print('\tRound '+str(counter)+' :Probes chosen')
     chosen_probes_lists.append(chosen_probes)
     probes_with_dimers=find_dimer_forming_probes(chosen_probes) #function that returns for each chosen probe whether if forms a dimer with one of the other chosen probes
     nr_of_dimer_probes=sum(probes_with_dimers)
     probes_with_dimers_lists.append(nr_of_dimer_probes)
-    print('\t'+str(nr_of_dimer_probes)+' probes form a dimer')
+    print('\t'+str(nr_of_dimer_probes)+' out of '+str(len(chosen_probes))+' probes form a dimer')
+    min_dimers=min(nr_of_dimer_probes,min_dimers)
     # put the above lines in a function that can be called ~100 times to be able to find the best subset of probes.
     counter+=1
 chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
 chosen_set=chosen_probes_lists[chosen_set_index]
-print(chosen_set)
 seq_list=[]
+
+print('minimal number of dimers is '+str(min_dimers))
+with open(targets,'r') as handle:
+    reader=csv.reader(handle,delimiter='\t')
+    description_list=[]
+    for row in reader:
+        description_list.append(str(row[0]+'\t'+row[-1]))
+
 with open(output_name,'w') as handle:
     for i,probe in enumerate(chosen_set):
         if probe == None:
             pass
         else:
             probename=str(i)
-            seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=probename))
+            probe_description=description_list[i]
+            seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=probename,description=probe_description))
     SeqIO.write(seq_list,handle,'fasta')
 #print(probes_with_dimers_lists)
 #print(chosen_probes_lists)
