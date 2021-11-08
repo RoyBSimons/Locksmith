@@ -48,15 +48,15 @@ with open(probes, 'r') as handle:
     reader=csv.reader(handle)
     possible_probes_all_targets=[]
     for i,row in enumerate(reader):
-        possible_probes_all_targets.append([row[0]])
-        for probe in row[1:]:
+        possible_probes_all_targets.append([])
+        for probe in row:
             possible_probes_all_targets[i].append(probe)
 with open(scores, 'r') as handle:
     reader=csv.reader(handle)
     probe_scores=[]
     for i,row in enumerate(reader):
-        probe_scores.append([float(row[0])])
-        for score in row[1:]:
+        probe_scores.append([])
+        for score in row:
             probe_scores[i].append(float(score))
 #--------------------------------------------------------
 def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter):

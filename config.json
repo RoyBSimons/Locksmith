@@ -1,9 +1,9 @@
 {
     "output_directory" : "output",
-    "cpg_bed_path" : "data/CpG_bed_nomenclature/CpG_hg19_chr*",
-    "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg19/hg19_split/",
-    "PATH_to_reference_genome_fasta" : "/media/disk3/roy/genomes/hg19/hg19.fa",
-    "ftp_path_snp_database" : "ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.25.gz",
+    "cpg_bed_path" : "data/hg38/CpG_IDs/chr*",
+    "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg38/hg38_chromosomes",
+    "PATH_to_reference_genome_fasta" : "/media/disk3/roy/genomes/hg38/hg38.fna_norm",
+    "ftp_path_snp_database" : "ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.39.gz",
     "target_range" : "100",
     "SNP_frequency_threshold" : "0.01",
     "Backbone_sequence" : [
