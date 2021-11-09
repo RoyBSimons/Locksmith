@@ -257,10 +257,6 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
                     if locus in range(int(arm2[1]),int(arm2[2])+1): #check whether the SNP is in the arm
                         SNP_count[i][j]+=1
     return SNP_count
-
-def get_probe_scores(probe_arms,tms,CpG_conflicts,SNP_conflicts,hairpin_score):
-    probe_score=hairpin_score*100+CpG_conflicts*10+SNP_conflicts*10+tms[2]
-    return probe_score
 #----------------------------------------------------------------------------------------------------------
 
 with open(filename) as handle:
@@ -290,12 +286,6 @@ print('\tHairpins detected')
 SNP_conflicts=obtain_SNPs(possible_arm_combinations_all_targets,bedfile,freq_threshold)
 print('\tSNPs in arms counted')
 
-pool=mp.Pool(nr_of_cores)
-probe_scores=[[pool.apply(get_probe_scores,args=(probe_arms,tms[i][j],CpG_conflicts[i][j],SNP_conflicts[i][j],hairpin_scores[i][j])) for j,probe_arms in enumerate(possible_arm_combinations)] for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that scores each probe based on Tms, CpG/SNP conflicts and hairpin score
-pool.close()
-print('\tProbe scores computed')
-
-#print(probe_scores)
 #------------------------------------------------------ Store all information from the prossible probes into files
 #with open(outputdir+'possible_arm_combinations_all_targets.csv', 'w') as file:
 #    for item in possible_arm_combinations_all_targets:
@@ -319,9 +309,5 @@ with open(outputdir+'hairpin_scores.csv', 'w') as file:
             file.write("\n")
 with open(outputdir+'SNP_conflicts.csv', 'w') as file:
     for item in SNP_conflicts:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
-with open(outputdir+'probe_scores.csv', 'w') as file:
-    for item in probe_scores:
             file.write(",".join(map(str,item)))
             file.write("\n")

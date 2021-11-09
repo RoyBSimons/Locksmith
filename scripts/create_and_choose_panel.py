@@ -23,8 +23,6 @@ parser.add_argument("-a", "--hairpins", dest="hairpins",
                     help="csv file containing hairpins of probes", metavar="HAIRPINS")
 parser.add_argument("-n", "--snp", dest="snps",
                     help="csv file containing amount of snps in probe arms", metavar="SNPS")
-parser.add_argument("-s", "--score", dest="scores",
-                    help="csv file containing scores of probes", metavar="SCORES")
 parser.add_argument("-r", "--targets", dest="targets",
                     help="Bedfile containing the targets to capture", metavar="BED")
 parser.add_argument("-t", "--cores", dest="cores",
@@ -33,12 +31,11 @@ args = vars(parser.parse_args())
 
 output_name=args["output_name"]
 config_file=args["config_file"]
-tms=args['tms']
+tms_file=args['tms']
 cpgs=args['cpg']
 probes=args['probes']
 hairpins=args['hairpins']
 snps=args['snps']
-scores=args['scores']
 targets=args['targets']
 nr_of_cores=int(args["cores"])
 with open(config_file) as jsonFile:
@@ -53,13 +50,48 @@ with open(probes, 'r') as handle:
         possible_probes_all_targets.append([])
         for probe in row:
             possible_probes_all_targets[i].append(probe)
-with open(scores, 'r') as handle:
+
+#--------------------------------------------------------
+def get_probe_scores(tms,CpG_conflicts,SNP_conflicts,hairpin_score):
+    probe_score=hairpin_score*10+CpG_conflicts*1+SNP_conflicts*1+tms[2]
+    return float(probe_score)
+
+with open(tms_file, 'r') as handle:
     reader=csv.reader(handle)
-    probe_scores=[]
+    tms=[]
     for i,row in enumerate(reader):
-        probe_scores.append([])
-        for score in row:
-            probe_scores[i].append(float(score))
+        tms.append([])
+        for probe in row:
+            tms[i].append(probe)
+
+with open(cpgs, 'r') as handle:
+    reader=csv.reader(handle)
+    CpG_conflicts=[]
+    for i,row in enumerate(reader):
+        CpG_conflicts.append([])
+        for probe in row:
+            CpG_conflicts[i].append(probe)
+
+with open(snps, 'r') as handle:
+    reader=csv.reader(handle)
+    SNP_conflicts=[]
+    for i,row in enumerate(reader):
+        SNP_conflicts.append([])
+        for probe in row:
+            SNP_conflicts[i].append(probe)
+
+with open(hairpins, 'r') as handle:
+    reader=csv.reader(handle)
+    hairpin_scores=[]
+    for i,row in enumerate(reader):
+        hairpin_scores.append([])
+        for probe in row:
+            hairpin_scores[i].append(probe)
+
+pool=mp.Pool(nr_of_cores)
+probe_scores=[[pool.apply(get_probe_scores,args=(tms[i][j],CpG_conflicts[i][j],SNP_conflicts[i][j],hairpin_scores[i][j])) for j,probe_arms in enumerate(possible_arm_combinations)] for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that scores each probe based on Tms, CpG/SNP conflicts and hairpin score
+pool.close()
+print('\tProbe scores computed')
 #--------------------------------------------------------
 def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter):
     if possible_arm_combinations==[]:
