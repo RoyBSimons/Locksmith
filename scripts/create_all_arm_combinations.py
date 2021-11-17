@@ -82,7 +82,7 @@ def create_all_possible_arms(record,min_target_length,max_target_length,min_arm_
                     probe_list.append(probe)
     return probe_list
 
-def create_all_possible_arms_both_strands(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_CG_percentage,max_CG_percentage,cpg_flanks,mid_loc):
+def create_all_possible_arms_both_strands(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_CG_percentage,max_CG_percentage,cpg_flanks,mid_loc,cpg_id):
     probe_list=[]
     i=0
     rev_record=record.reverse_complement()
@@ -105,7 +105,7 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
                     else:
                         pass
                     upstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
-                    probe=[new_u_arm,new_d_arm,upstream_id,downstream_id,i,target_length,'+']
+                    probe=[new_u_arm,new_d_arm,upstream_id,downstream_id,i,target_length,'+',cpg_id]
                     i+=1
                     probe_list.append(probe)
     for target_length in range(min_target_length,max_target_length+1): #loop over range of target lengths, including the maximum
@@ -127,7 +127,7 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
                     else:
                         pass
                     downstream_id_rev=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
-                    probe=[new_u_arm_rev,new_d_arm_rev,upstream_id_rev,downstream_id_rev,i,target_length,'-']
+                    probe=[new_u_arm_rev,new_d_arm_rev,upstream_id_rev,downstream_id_rev,i,target_length,'-',cpg_id]
                     i+=1
                     probe_list.append(probe)
     return probe_list
@@ -259,9 +259,15 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
     return SNP_count
 #----------------------------------------------------------------------------------------------------------
 
+cpg_id_list=[]
+with open(bedfile,'r') as handle:
+    reader=csv.reader(handle, delimiter='\t')
+    for row in reader:
+        cpg_id_list.append(row[3])
+print(cpg_id_list)
 with open(filename) as handle:
     pool=mp.Pool(nr_of_cores)#mp.cpu_count())
-    possible_arm_combinations_all_targets=[pool.apply(create_all_possible_arms_both_strands,args=(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_target_length,max_CG_percentage,cpg_flanks,mid_loc)) for record in SeqIO.parse(handle,"fasta")]
+    possible_arm_combinations_all_targets=[pool.apply(create_all_possible_arms_both_strands,args=(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_target_length,max_CG_percentage,cpg_flanks,mid_loc,cpg_id_list[i])) for i,record in enumerate(SeqIO.parse(handle,"fasta"))]
     pool.close()
 print('All possible arms obtained')
 pool=mp.Pool(nr_of_cores)
@@ -311,3 +317,7 @@ with open(outputdir+'SNP_conflicts.csv', 'w') as file:
     for item in SNP_conflicts:
             file.write(",".join(map(str,item)))
             file.write("\n")
+with open(outputdir+'probe_arms.csv','w') as file:
+    for item in possible_arm_combinations_all_targets:
+        file.write('\t'.join(map(str,item)))
+        file.write('\n')
