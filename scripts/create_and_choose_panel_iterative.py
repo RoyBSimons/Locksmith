@@ -7,6 +7,7 @@ from Bio import SeqIO, Seq, SeqRecord
 import multiprocessing as mp
 from numpy.random import choice
 import csv
+import numpy as np
 
 parser = ArgumentParser()
 parser.add_argument("-o", "--output", dest="output_name",
@@ -125,7 +126,8 @@ probe_scores=[[pool.apply(get_probe_scores,args=(tms[i][j],CpG_conflicts[i][j],S
 pool.close()
 print('\tProbe scores computed')
 
-def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter,probe_id_list):
+def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter,probe_id_list,seed):
+    np.random.seed(seed)
     if probe_scores==[]:
         return
     else:
@@ -389,13 +391,14 @@ def find_dimer_forming_probes_iterative(chosen_probes):
 chosen_probes_lists=[]
 probes_with_dimers_lists=[]
 counter=0
+seed=11 #move to config file
 min_dimers=len(possible_probes_all_targets)
 while counter<permutations and min_dimers>0:
     #Choose random probe set
     # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
     pool=mp.Pool(nr_of_cores)
     chosen_probes=[]
-    chosen_probes=[pool.apply(choose_probes_from_scores,args=(probe_scores[i],possible_arm_combinations,permutations,counter,probe_id_list[i])) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the score
+    chosen_probes=[pool.apply(choose_probes_from_scores,args=(probe_scores[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the score
     pool.close()
     print('\tRound '+str(counter)+' :Probes chosen')
     
