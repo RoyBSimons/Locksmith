@@ -7,6 +7,7 @@ from Bio import SeqIO, Seq, SeqRecord
 from Bio.SeqUtils import GC
 import multiprocessing as mp
 import csv
+import numpy as np
 
 #parse all files
 parser = ArgumentParser()
@@ -134,25 +135,21 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
 with open(filename) as handle:
     for record in SeqIO.parse(handle,"fasta"):
         pass
-#
-def get_delta_Tm(probe_arms): #Wallace rule from (Abdul-Latiff et al., 2017)
-#    print(probe)
-#    print('above this line is the probe')
-    upstream_arm=probe_arms[0]
-    downstream_arm=probe_arms[1]
-#    print(upstream_arm)
-    A=upstream_arm.count('A')
-    T=upstream_arm.count('T')
-    G=upstream_arm.count('G')
-    C=upstream_arm.count('C')
-    Tm_up=64.9+41*(G+C-16.4)/(A+T+C+G)
-    A=downstream_arm.count('A')
-    T=downstream_arm.count('T')
-    G=downstream_arm.count('G')
-    C=downstream_arm.count('C')
-    Tm_down=64.9+41*(G+C-16.4)/(A+T+C+G)
-    delta_Tm=round(abs(Tm_up-Tm_down),1)
-    return [Tm_up,Tm_down,delta_Tm]
+
+def get_delta_Tm_array(probe_arms_array):
+    Tm_array=[]
+    A=[[string[0].count('A') for string in row] for row in probe_arms_array]
+    T=[[string[0].count('T') for string in row] for row in probe_arms_array]
+    G=[[string[0].count('G') for string in row] for row in probe_arms_array]
+    C=[[string[0].count('C') for string in row] for row in probe_arms_array]
+    Tm_up=[np.add(64.9,np.divide(np.multiply(41,np.add(G[i],np.subtract(C[i],16.4))),np.add(np.add(A[i],T[i]),np.add(C[i],G[i])))) for i in range(len(A))] #Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
+    A=[[string[1].count('A') for string in row] for row in probe_arms_array]
+    T=[[string[1].count('T') for string in row] for row in probe_arms_array]
+    G=[[string[1].count('G') for string in row] for row in probe_arms_array]
+    C=[[string[1].count('C') for string in row] for row in probe_arms_array]
+    Tm_down=[np.add(64.9,np.divide(np.multiply(41,np.add(G[i],np.subtract(C[i],16.4))),np.add(np.add(A[i],T[i]),np.add(C[i],G[i])))) for i in range(len(A))] #Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
+    Tms=[[[Tm_up[i][j],Tm_down[i][j],np.round(np.absolute(np.subtract(Tm_down[i][j],Tm_up[i][j])),1)] for j in range(len(A[i]))] for i in range(len(A))]
+    return Tms
 
 def report_CpGs_in_arms(probe_arms):
     upstream_arm=probe_arms[0]
@@ -270,9 +267,8 @@ with open(filename) as handle:
     possible_arm_combinations_all_targets=[pool.apply(create_all_possible_arms_both_strands,args=(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_target_length,max_CG_percentage,cpg_flanks,mid_loc,cpg_id_list[i])) for i,record in enumerate(SeqIO.parse(handle,"fasta"))]
     pool.close()
 print('All possible arms obtained')
-pool=mp.Pool(nr_of_cores)
-tms=[[pool.apply(get_delta_Tm, args=([probe_arms])) for probe_arms in possible_arm_combinations] for possible_arm_combinations in possible_arm_combinations_all_targets]
-pool.close()
+#Array method instead of parallelization in order to calculate Tms faster
+tms=get_delta_Tm_array(possible_arm_combinations_all_targets)
 print('\tTms obtained')
 pool=mp.Pool(nr_of_cores)
 CpG_conflicts=[[pool.apply(report_CpGs_in_arms, args=([probe_arms])) for probe_arms in possible_arm_combinations] for possible_arm_combinations in possible_arm_combinations_all_targets]
