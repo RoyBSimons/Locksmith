@@ -169,6 +169,39 @@ def find_dimer_forming_probes(chosen_probes):
 ###################################
 ###################################
 ###################################
+def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
+    probe_list=[]
+    probe_list_count=[]
+    for probe in conflicting_cpg_list_dimer: #only look into the first mentioned probes when forming a dimer
+        if probe in probe_list:
+            probe_list_count[probe_list.index(probe)]+=1
+        else:
+            probe_list.append(probe)
+            probe_list_count.append(1)
+    if probe_list_count==[]:
+        probe_list_count=[0]
+    nr_of_times=max(probe_list_count)
+    sorted_nr_list=[]
+    sorted_probe_list=[]
+    while nr_of_times >0:
+        for i,nr in enumerate(probe_list_count):
+            if nr == nr_of_times:
+                sorted_probe_list.append(probe_list[i])
+                sorted_nr_list.append(nr)
+        nr_of_times=nr_of_times-1
+    most_conflicting_probe_list=sorted_probe_list[0:int(len(sorted_probe_list)/2)] #exclude the top half most dimer-forming proibes
+    most_conflicting_dimer_range_list=[]
+    for probe in most_conflicting_probe_list: #report the conflicting locus at first occurrence of dimer
+        index=conflicting_cpg_list_dimer.index(probe)
+        most_conflicting_dimer_range_list.append(conflict_range_dimer[index])
+    return most_conflicting_dimer_range_list
+
+def get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2):
+    most_conflicting_dimer_range_list=get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer)
+    most_conflicting_dimer_range_list2=get_conflict_ranges_S1(conflicting_cpg_list_dimer2,conflict_range_dimer2)
+    combined_most_conflicting_dimer_range_list=most_conflicting_dimer_range_list+most_conflicting_dimer_range_list2
+    return combined_most_conflicting_dimer_range_list
+
 def find_dimer_forming_probes_iterative(chosen_probes):
     #Create a fasta file with the chosen probes
     passed_list=[]
@@ -311,31 +344,8 @@ def find_dimer_forming_probes_iterative(chosen_probes):
                 conflict_range_dimer2.append(dimer_range2)
 
     #Only report the probe that formed the most amount of dimers
-    probe_list=[]
-    probe_list_count=[]
-    for probe in conflicting_cpg_list_dimer: #only look into the first mentioned probes when forming a dimer
-        if probe in probe_list:
-            probe_list_count[probe_list.index(probe)]+=1
-        else:
-            probe_list.append(probe)
-            probe_list_count.append(1)
-    if probe_list_count==[]:
-        probe_list_count=[0]
-    nr_of_times=max(probe_list_count)
-    sorted_nr_list=[]
-    sorted_probe_list=[]
-    while nr_of_times >0:
-        for i,nr in enumerate(probe_list_count):
-            if nr == nr_of_times:
-                sorted_probe_list.append(probe_list[i])
-                sorted_nr_list.append(nr)
-        nr_of_times=nr_of_times-1
-    most_conflicting_probe_list=sorted_probe_list[0:int(len(sorted_probe_list)/2)] #exclude the top half most dimer-forming proibes
-    most_conflicting_dimer_range_list=[]
-    for probe in most_conflicting_probe_list: #report the conflicting locus at first occurrence of dimer
-        index=conflicting_cpg_list_dimer.index(probe)
-        most_conflicting_dimer_range_list.append(conflict_range_dimer[index])
-
+    most_conflicting_dimer_range_list=get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2) #obtain conflict ranges from dimer forming probes
+    
     #find all probes that have common regions with the most_conflicting_dimer_range and report those as conflicting probes
     all_conflicting_probe_list=[]
     conflicting_targets=set([])
