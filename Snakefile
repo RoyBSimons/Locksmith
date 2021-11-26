@@ -46,22 +46,7 @@ rule create_probes:
 	shell:
 		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]}"
 #--------------------------------------------------------------------------------------------------
-#STEP 3A
-rule create_and_choose_panel:
-	input:
-		config_file=config['output_directory']+"/config.json",
-		tms=config['output_directory']+"/tms.csv",
-		cpg=config['output_directory']+"/CpG_conflicts.csv",
-		probes=config['output_directory']+"/possible_probes_all_targets.csv",
-		hairpins=config['output_directory']+"/hairpin_scores.csv",
-		snp=config['output_directory']+"/SNP_conflicts.csv",
-		target=config['output_directory']+"/target_list_range.bed"
-	output:
-		fasta=config['output_directory']+"/chosen_panel.fasta"
-	shell:
-		"python scripts/create_and_choose_panel.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -t {config[max_threads]}"
-
-#STEP 3B
+#STEP 3
 rule create_and_choose_panel_iteratively:
         input:
                 config_file=config['output_directory']+"/config.json",
