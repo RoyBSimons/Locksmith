@@ -151,17 +151,15 @@ def get_delta_Tm_array(probe_arms_array):
     Tms=[[[Tm_up[i][j],Tm_down[i][j],np.round(np.absolute(np.subtract(Tm_down[i][j],Tm_up[i][j])),1)] for j in range(len(A[i]))] for i in range(len(A))]
     return Tms
 
-def report_CpGs_in_arms(probe_arms):
-    upstream_arm=probe_arms[0]
-    downstream_arm=probe_arms[1]
-    counts=upstream_arm.count('CG')+downstream_arm.count('CG')
-    return counts
+def report_CpGs_in_arms(probe_arms_array):
+    upstream_count=[[string[0].count('CG') for string in row] for row in probe_arms_array]
+    downstream_count=[[string[1].count('CG') for string in row] for row in probe_arms_array]
+    counts_array=[np.add(upstream_count[i],downstream_count[i]) for i in range(len(upstream_count))]
+    return counts_array
 
-def add_backbone(probe_arms,backbone_sequence):
-    upstream_arm=probe_arms[0]
-    downstream_arm=probe_arms[1]
-    probe=upstream_arm+backbone_sequence+downstream_arm
-    return str(probe)
+def add_backbone_array(probe_arms_array,backbone_sequence):
+    probe_array=[[string[0]+backbone_sequence+string[1] for string in row ] for row in probe_arms_array]
+    return probe_array
 
 def check_probe_for_hairpin_score(probes,fasta_name,outputname_json,index):
     seq_list=[]
@@ -270,13 +268,9 @@ print('All possible arms obtained')
 #Array method instead of parallelization in order to calculate Tms faster
 tms=get_delta_Tm_array(possible_arm_combinations_all_targets)
 print('\tTms obtained')
-pool=mp.Pool(nr_of_cores)
-CpG_conflicts=[[pool.apply(report_CpGs_in_arms, args=([probe_arms])) for probe_arms in possible_arm_combinations] for possible_arm_combinations in possible_arm_combinations_all_targets]
-pool.close()
+CpG_conflicts=report_CpGs_in_arms(possible_arm_combinations_all_targets)
 print('\tCpGs in arms counted')
-pool=mp.Pool(nr_of_cores)
-possible_probes_all_targets=[[pool.apply(add_backbone, args=(probe_arms,backbone_sequence)) for probe_arms in possible_arm_combinations] for possible_arm_combinations in possible_arm_combinations_all_targets]
-pool.close()
+possible_probes_all_targets=add_backbone_array(possible_arm_combinations_all_targets,backbone_sequence)
 print('\tBackbone added')
 fasta_name='temp_test_fasta'
 outputname_json='temp_test_json'
