@@ -1,18 +1,37 @@
 #!/usr/bin/python3
 #analyzing probe dimer conflicts
 import csv
+from argparse import ArgumentParser
+import json
+import matplotlib
+import matplotlib.pyplot as plt
+parser = ArgumentParser()
+parser.add_argument("-i", "--input", dest="input_name",
+                    help="input json file (mfeprimer dimer output)", metavar="INPUTNAME")
+parser.add_argument("-o", "--output", dest="output_name",
+                    help="Fasta file which will contain the chosen probes as output", metavar="OUTPUTNAME")
 probe_list=[]
 probe_list_count=[]
-with open('output/selection_0/conflicting_probes_dimers.tsv') as handle:
-    handle.readline()
-    reader=csv.reader(handle,delimiter='\t')
-    for row in reader:
-        probe=row[0]
+Tm_list=[]
+args=vars(parser.parse_args())
+input_name=args['input_name']
+output_name=args['output_name']
+with open(input_name) as handle:
+    data=json.load(handle)
+    for row in data:
+        Tm=row['Tm']
+        probe=row['S1']['ID']
+        Tm_list.append(Tm)
         if probe in probe_list:
             probe_list_count[probe_list.index(probe)]+=1
         else:
             probe_list.append(probe)
             probe_list_count.append(1)
+matplotlib.use('Agg')
+plt.hist(Tm_list)
+plt.xlabel('Tm (C)')
+plt.ylabel('Occurence')
+plt.savefig(output_name+'.png')
 nr_of_times=max(probe_list_count)
 sorted_nr_list=[]
 sorted_probe_list=[]
@@ -26,7 +45,7 @@ while nr_of_times >0:
 
 
 
-with open('Analysis_probe_conflicts.tsv','w') as outputfile:
+with open(output_name,'w') as outputfile:
     outputfile.write('Probe_name\tnr\n')
     writer=csv.writer(outputfile,delimiter='\t')
     for i,probe in enumerate(sorted_probe_list):
