@@ -8,7 +8,7 @@ from Bio.SeqUtils import GC
 import multiprocessing as mp
 import csv
 import numpy as np
-
+import pickle
 #parse all files
 parser = ArgumentParser()
 parser.add_argument("-i", "--input", dest="filename",
@@ -148,7 +148,8 @@ def get_delta_Tm_array(probe_arms_array):
     G=[[string[1].count('G') for string in row] for row in probe_arms_array]
     C=[[string[1].count('C') for string in row] for row in probe_arms_array]
     Tm_down=[np.add(64.9,np.divide(np.multiply(41,np.add(G[i],np.subtract(C[i],16.4))),np.add(np.add(A[i],T[i]),np.add(C[i],G[i])))) for i in range(len(A))] #Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
-    Tms=[[[Tm_up[i][j],Tm_down[i][j],np.round(np.absolute(np.subtract(Tm_down[i][j],Tm_up[i][j])),1)] for j in range(len(A[i]))] for i in range(len(A))]
+    Tms=[[np.round(np.absolute(np.subtract(Tm_down[i][j],Tm_up[i][j])),1) for j in range(len(A[i]))] for i in range(len(A))]
+    #Tms=[[[Tm_up[i][j],Tm_down[i][j],np.round(np.absolute(np.subtract(Tm_down[i][j],Tm_up[i][j])),1)] for j in range(len(A[i]))] for i in range(len(A))]
     return Tms
 
 def report_CpGs_in_arms(probe_arms_array):
@@ -287,10 +288,8 @@ print('\tSNPs in arms counted')
 #    for item in possible_arm_combinations_all_targets:
 #            file.write(",".join(map(str,item)))
 #            file.write("\n")
-with open(outputdir+'tms.csv', 'w') as file:
-    for item in tms:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
+with open(outputdir+'tms.csv', 'wb') as file:
+    pickle.dump(tms,file)
 with open(outputdir+'CpG_conflicts.csv', 'w') as file:
     for item in CpG_conflicts:
             file.write(",".join(map(str,item)))

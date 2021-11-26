@@ -8,7 +8,7 @@ import multiprocessing as mp
 from numpy.random import choice
 import csv
 import numpy as np
-
+import pickle
 parser = ArgumentParser()
 parser.add_argument("-o", "--output", dest="output_name",
                     help="Fasta file which will contain the chosen probes as output", metavar="OUTPUTNAME")
@@ -62,38 +62,38 @@ with open(probes, 'r') as handle:
         for probe in row:
             possible_probes_all_targets[i].append(probe)
 
-with open(tms_file, 'r') as handle:
-    reader=csv.reader(handle)
-    tms=[]
-    for i,row in enumerate(reader):
-        tms.append([])
-        for probe in row:
-            tms[i].append(probe)
-
+with open(tms_file, 'rb') as handle:
+    tms=pickle.load(handle)
+    tms=np.array(tms,dtype=object)
 with open(cpgs, 'r') as handle:
     reader=csv.reader(handle)
     CpG_conflicts=[]
     for i,row in enumerate(reader):
-        CpG_conflicts.append([])
+        cpg_conflict_list=[]
         for probe in row:
-            CpG_conflicts[i].append(probe)
+            cpg_conflict_list.append(int(probe))
+        CpG_conflicts.append(np.array(cpg_conflict_list,dtype=object))
+    CpG_conflicts=np.array(CpG_conflicts,dtype=object)
 
 with open(snps, 'r') as handle:
     reader=csv.reader(handle)
     SNP_conflicts=[]
     for i,row in enumerate(reader):
-        SNP_conflicts.append([])
+        snp_conflict_list=[]
         for probe in row:
-            SNP_conflicts[i].append(probe)
+            snp_conflict_list.append(int(probe))
+        SNP_conflicts.append(np.array(snp_conflict_list,dtype=object))
+    SNP_conflicts=np.array(SNP_conflicts,dtype=object)
 
 with open(hairpins, 'r') as handle:
     reader=csv.reader(handle)
     hairpin_scores=[]
     for i,row in enumerate(reader):
-        hairpin_scores.append([])
+        hairpin_score_list=[]
         for probe in row:
-            hairpin_scores[i].append(probe)
-
+            hairpin_score_list.append(int(probe))
+        hairpin_scores.append(np.array(hairpin_score_list,dtype=object))
+    hairpin_scores=np.array(hairpin_scores,dtype=object)
 with open(probe_arms_file,'r') as handle:
     reader=csv.reader(handle,delimiter='\t')
     probe_arm_list=[]
@@ -117,18 +117,16 @@ with open(probe_arms_file,'r') as handle:
             probe_id_list[i].append(probe[7][2:-1]+':'+probe[4][1:])
             arm_upstream_list[i].append(probe[0])
             arm_downstream_list[i].append(probe[1])
-def get_probe_scores(tms,CpG_conflicts,SNP_conflicts,hairpin_score):
-    probe_score=hairpin_score*10+CpG_conflicts*1+SNP_conflicts*1+tms[2]
-    return float(probe_score)
 
-pool=mp.Pool(nr_of_cores)
-probe_scores=[[pool.apply(get_probe_scores,args=(tms[i][j],CpG_conflicts[i][j],SNP_conflicts[i][j],hairpin_scores[i][j])) for j,probe_arms in enumerate(possible_arm_combinations)] for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that scores each probe based on Tms, CpG/SNP conflicts and hairpin score
-pool.close()
+def get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_array):
+    probe_score=np.add(np.add(np.add(np.multiply(hairpin_array,int(10^10)),CpG_conflicts),SNP_conflicts),tms)
+    return probe_score
+
+probe_scores=get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
 print('\tProbe scores computed')
-
 def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter,probe_id_list,seed):
     np.random.seed(seed)
-    if probe_scores==[]:
+    if probe_scores.size==0:
         return
     else:
         sum_score=sum(probe_scores)
@@ -416,7 +414,7 @@ while counter<permutations and min_dimers>0:
     for probe in probes_with_dimers:
         probe_index=probe_cpg_id_list.index(probe.split(':')[0])
         nested_index=probe_id_list[probe_index].index(probe)
-        probe_scores[probe_index][nested_index]=10^10
+        probe_scores[probe_index][nested_index]+=10^10
     #exclude probes that form dimers from being chosen (try around with e.g. top 25% or top 1)
     
 
