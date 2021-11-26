@@ -172,7 +172,7 @@ def check_probe_for_hairpin_score(probes,fasta_name,outputname_json,index):
             probename=str(i)
             seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe),id=probename))
         SeqIO.write(seq_list,output_handle,'fasta')
-    os.system('mfeprimer hairpin --in '+fasta_name+str(index)+'.fa -j -o '+outputname_json+str(index)) #Remove/move the output files
+    os.system('mfeprimer hairpin --in '+fasta_name+str(index)+'.fa -j -o '+outputname_json+str(index)+' -s 7 -t 10') #Remove/move the output files; score cut-off is 7, tm threshold is 10 C
     with open(outputname_json+str(index)+'.json') as jsonFile:
         hairpinlist = json.load(jsonFile)
         jsonFile.close()

@@ -149,7 +149,7 @@ def find_dimer_forming_probes(chosen_probes):
                 handle.write('>'+str(i)+'\n')
                 handle.write(probe+'\n')
     #test the chosen probes set for dimers
-    os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes')
+    os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s 7 -t 10') #scores cut-off is 7, temperature minimum is 10 degrees
     os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
     dimers=[False for i in range(len(chosen_probes))]
     with open('tmp_dimers_chosen_probes.json') as handle:
@@ -214,7 +214,7 @@ def find_dimer_forming_probes_iterative(chosen_probes):
                 handle.write(probe[0]+'\n')
     #test the chosen probes set for dimers
     os.system('cp tmp_fasta_chosen_probes.fasta ~/opt/test.fasta')
-    os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes')
+    os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s 7 -t 10') #score cut-off is 7, temperature minimum is 10 degrees
     os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
     dimer_file='tmp_dimers_chosen_probes.json'
     with open(dimer_file) as jsonFile:
