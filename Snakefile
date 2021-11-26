@@ -3,14 +3,22 @@ rule all:
 	input:
 		fasta=config['output_directory']+"/chosen_panel_iterative.fasta"
 #---------------------------------------------------------------------------------------------------
+rule copy_config_to_output_directory:
+	input:
+		"config.json"
+	output:
+		config['output_directory']+"/config.json"
+	shell:
+		"cp {input} {output}"
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
 	input:
-		"data/target_list.bed"
+		target="data/target_list.bed",
+		c=config['output_directory']+"/config.json"
 	output:
 		config['output_directory']+"/target_list_range.bed"
 	shell:
-		"python scripts/target_2_target_range_list.py -f {input} -o {output} -r {config[target_range]}"
+		"python scripts/target_2_target_range_list.py -f {input.target} -o {output} -r {config[target_range]}"
 
 rule extract_target_sequences:
 	input:
@@ -26,7 +34,7 @@ rule extract_target_sequences:
 rule create_probes:
 	input:
 		targets=config['output_directory']+"/target_sequences.fa",
-		config_file="config.json",
+		config_file=config['output_directory']+"/config.json",
 		bed=config['output_directory']+"/target_list_range.bed"
 	output:
 		tms=config['output_directory']+"/tms.csv",
@@ -41,7 +49,7 @@ rule create_probes:
 #STEP 3A
 rule create_and_choose_panel:
 	input:
-		config_file="config.json",
+		config_file=config['output_directory']+"/config.json",
 		tms=config['output_directory']+"/tms.csv",
 		cpg=config['output_directory']+"/CpG_conflicts.csv",
 		probes=config['output_directory']+"/possible_probes_all_targets.csv",
@@ -56,7 +64,7 @@ rule create_and_choose_panel:
 #STEP 3B
 rule create_and_choose_panel_iteratively:
         input:
-                config_file="config.json",
+                config_file=config['output_directory']+"/config.json",
                 tms=config['output_directory']+"/tms.csv",
                 cpg=config['output_directory']+"/CpG_conflicts.csv",
                 probes=config['output_directory']+"/possible_probes_all_targets.csv",
