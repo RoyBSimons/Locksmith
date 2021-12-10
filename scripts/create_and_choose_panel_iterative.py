@@ -68,7 +68,6 @@ with open(probes, 'r') as handle:
         possible_probes_all_targets.append([])
         for probe in row:
             possible_probes_all_targets[i].append(probe)
-
 with open(tms_file, 'rb') as handle:
     tms=pickle.load(handle)
     tms=np.array(tms,dtype=object)
@@ -248,8 +247,7 @@ def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up
     return new_conflicting_indices_list
 
 
-def rescore_dimer_forming_probes_iterative(chosen_probes):
-    start=time.time()#Create a fasta file with the chosen probes
+def rescore_dimer_forming_probes_iterative(chosen_probes):#Create a fasta file with the chosen probes
     passed_list=[]
     with open('tmp_fasta_chosen_probes.fasta','w') as handle:
         for i,probe in enumerate(chosen_probes):
@@ -334,32 +332,20 @@ def rescore_dimer_forming_probes_iterative(chosen_probes):
     #find all probes that have common regions with the most_conflicting_dimer_range and report those as conflicting probes
     all_conflicting_probe_list=[]
     conflicting_targets=set([])
-    end_time_dimer=time.time()
-    print('Obtaining dimer ranges takes '+str(end_time_dimer-start_time_dimer)+ 'seconds')
-
-    start_t=time.time()    
+    print('Dimer ranges obtained')
     loci_up_bedfile_name=outputdir+'loci_up.bed'
     loci_down_bedfile_name=outputdir+'loci_down.bed'
     dimer_bedfile_name=outputdir+'conflicting_dimer.bed'
     bedfile_intersect_name=outputdir+'conflicting_loci.bed'
     new_conflicting_indices_list=create_conflicting_indices_list_bedtools(arm_upstream_loc_list,arm_downstream_loc_list,loci_up_bedfile_name,loci_down_bedfile_name,most_conflicting_dimer_range_list,dimer_bedfile_name,bedfile_intersect_name)
-
-    end_t=time.time()
-    print('that one function takes '+str(end_t-start_t)+' seconds')
-    start_t=time.time()
+    print('Conflicts found')
     all_conflicting_indices=[indices for indices_list in new_conflicting_indices_list for indices in indices_list]
-    end_t=time.time()
-    print('first loop takes '+str(end_t-start_t)+' seconds')
-    start_t=time.time()
     for indexes in new_conflicting_indices_list:
         i=int(indexes[0])
         j=int(indexes[1])
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
         probe_scores[i][j]+=10^10 #Adjust score of conflicting probe
-    end_t=time.time()
-    print('second loop of List comprehension takes '+ str(end_t-start_t)+' seconds')
-
     return all_conflicting_probe_list,conflicting_targets
 
 
@@ -372,7 +358,6 @@ counter=0
 seed=11 #move to config file
 min_dimers=len(possible_probes_all_targets)
 while counter<permutations and min_dimers>0:
-    start_big=time.time()
     #Choose random probe set
     # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
     pool=mp.Pool(nr_of_cores)
@@ -417,7 +402,3 @@ with open(conflicting_file,'w') as handle:
     writer=csv.writer(handle,delimiter='\t')
     for row in conflicting_probe_list:
         writer.writerow(row)
-
-
-
-
