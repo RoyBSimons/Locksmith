@@ -58,7 +58,8 @@ rule create_and_choose_panel_iteratively:
 		arms=config['output_directory']+"/probe_arms.csv",
                 target=config['output_directory']+"/target_list_range.bed"
         output:
-                fasta=config['output_directory']+"/chosen_panel_iterative.fasta"
+                fasta=config['output_directory']+"/chosen_panel_iterative.fasta",
+		conflicts=config['output_directory']+"/conflicting_probes_per_iteration.csv"
         shell:
-                "python scripts/create_and_choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]}"
+                "python scripts/create_and_choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts}"
 

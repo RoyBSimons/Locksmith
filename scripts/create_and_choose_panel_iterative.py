@@ -30,6 +30,10 @@ parser.add_argument("-b", "--arms", dest="probe_arms_file",
                     help="csv file containing probe arms", metavar="ARMS")
 parser.add_argument("-t", "--cores", dest="cores",
                     help="Passed amount of cores to script", metavar="Cores")
+parser.add_argument("-u", "--output_dir", dest="output_dir",
+                    help="Directory for output", metavar="OUTPUTDIR")
+parser.add_argument("-f", "--conflicting_output_file", dest="conflicting_file",
+                    help="Output filename for conflicting probes per iteration", metavar="CONFLICTS")
 args = vars(parser.parse_args())
 
 output_name=args["output_name"]
@@ -42,6 +46,8 @@ snps=args['snps']
 targets=args['targets']
 probe_arms_file=args['probe_arms_file']
 nr_of_cores=int(args["cores"])
+outputdir=args["output_dir"]+'/'
+conflicting_file=args["conflicting_file"]
 with open(config_file) as jsonFile:
     configObject = json.load(jsonFile)
     jsonFile.close()
@@ -456,6 +462,10 @@ with open(output_name,'w') as handle:
             probe_description=description_list[i]
             seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe[0]),id=probename,description=probe[1]))
     SeqIO.write(seq_list,handle,'fasta')
+with open(conflicting_file,'w') as handle:
+    writer=csv.writer(handle,delimiter='\t')
+    for row in conflicting_probe_list:
+        writer.writerow(row)
 
 
 
