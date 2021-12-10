@@ -11,7 +11,7 @@
 	    {
 		    "Reverse_complement_universal_forward_primer": "CTTAGGCTGGATCTTCTCCC",
 		    "Common_region": "GCGAATTTTA",
-		    "Universal_reverse_primer": "CTTAGGCTGGATCTTCTCCC"
+		    "Universal_reverse_primer": "ACCCTCACCAACTAGGAGAT"
 	    }
 	],
     "probe_specifics": [
