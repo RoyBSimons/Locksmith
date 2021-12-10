@@ -95,15 +95,15 @@ with open(hairpins, 'r') as handle:
             hairpin_score_list.append(int(probe))
         hairpin_scores.append(np.array(hairpin_score_list,dtype=object))
     hairpin_scores=np.array(hairpin_scores,dtype=object)
-with open(probe_arms_file,'r') as handle:
-    reader=csv.reader(handle,delimiter='\t')
+with open(probe_arms_file,'rb') as handle:
+    possible_arm_combinations_all_targets=pickle.load(handle)
     probe_arm_list=[]
     arm_upstream_loc_list=[]
     arm_downstream_loc_list=[]
     probe_id_list=[]
     arm_upstream_list=[]
     arm_downstream_list=[]
-    for i,row in enumerate(reader):
+    for i, row in enumerate(possible_arm_combinations_all_targets):
         probe_arm_list.append([])
         arm_upstream_loc_list.append([])
         arm_downstream_loc_list.append([])
@@ -111,11 +111,10 @@ with open(probe_arms_file,'r') as handle:
         arm_upstream_list.append([])
         arm_downstream_list.append([])
         for probe in row:
-            probe=probe.strip('][').split(',')
             probe_arm_list[i].append(probe)
             arm_upstream_loc_list[i].append(probe[2])
             arm_downstream_loc_list[i].append(probe[3])
-            probe_id_list[i].append(probe[7][2:-1]+':'+probe[4][1:])
+            probe_id_list[i].append(str(probe[7])+':'+str(probe[4]))
             arm_upstream_list[i].append(probe[0])
             arm_downstream_list[i].append(probe[1])
 

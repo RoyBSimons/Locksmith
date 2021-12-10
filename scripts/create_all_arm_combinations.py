@@ -87,6 +87,7 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
     probe_list=[]
     i=0
     rev_record=record.reverse_complement()
+    record_length=len(record.seq)
     for target_length in range(min_target_length,max_target_length+1): #loop over range of target lengths, including the maximum
         for arm_length_downstream in range(min_arm_length,max_arm_length+1):
             start_loc_downstream=mid_loc-(target_length-cpg_flanks)
@@ -106,7 +107,7 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
                     else:
                         pass
                     upstream_id=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
-                    probe=[new_u_arm,new_d_arm,upstream_id,downstream_id,i,target_length,'+',cpg_id]
+                    probe=[str(new_u_arm),str(new_d_arm),upstream_id,downstream_id,i,target_length,'+',cpg_id]
                     i+=1
                     probe_list.append(probe)
     for target_length in range(min_target_length,max_target_length+1): #loop over range of target lengths, including the maximum
@@ -120,15 +121,15 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
                     break
                 else:
                     pass
-                upstream_id_rev=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-arm_length_downstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc-1)
                 for arm_length_upstream in range(min_arm_length,max_arm_length+1):
                     new_u_arm_rev=rev_record.seq[start_loc_upstream:start_loc_upstream+arm_length_upstream]
                     if GC(new_u_arm_rev)> max_CG_percentage or GC(new_u_arm_rev)<min_CG_percentage:
                         break
                     else:
                         pass
-                    downstream_id_rev=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream)+"-"+str(int(record.id.split(':')[1].split("-")[0])+start_loc_upstream+arm_length_upstream-1)
-                    probe=[new_u_arm_rev,new_d_arm_rev,upstream_id_rev,downstream_id_rev,i,target_length,'-',cpg_id]
+                    upstream_id_rev=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+(record_length-start_loc_upstream-arm_length_upstream))+"-"+str(int(record.id.split(':')[1].split("-")[0])+(record_length-start_loc_upstream-1))
+                    downstream_id_rev=record.id.split(':')[0]+":"+str(int(record.id.split(':')[1].split("-")[0])+(record_length-start_loc))+"-"+str(int(record.id.split(':')[1].split("-")[0])+(record_length-start_loc+arm_length_downstream-1))
+                    probe=[str(new_u_arm_rev),str(new_d_arm_rev),upstream_id_rev,downstream_id_rev,i,target_length,'-',cpg_id]
                     i+=1
                     probe_list.append(probe)
     return probe_list
@@ -306,7 +307,5 @@ with open(outputdir+'SNP_conflicts.csv', 'w') as file:
     for item in SNP_conflicts:
             file.write(",".join(map(str,item)))
             file.write("\n")
-with open(outputdir+'probe_arms.csv','w') as file:
-    for item in possible_arm_combinations_all_targets:
-        file.write('\t'.join(map(str,item)))
-        file.write('\n')
+with open(outputdir+'probe_arms.csv','wb') as file:
+    pickle.dump(possible_arm_combinations_all_targets,file)
