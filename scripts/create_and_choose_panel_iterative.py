@@ -47,6 +47,7 @@ with open(config_file) as jsonFile:
     jsonFile.close()
 permutations=int(configObject['Permutations'])
 backbone_length=len(configObject["Backbone_sequence"][0]["Reverse_complement_universal_forward_primer"])+len(configObject["Backbone_sequence"][0]["Common_region"])+len(configObject["Backbone_sequence"][0]["Universal_reverse_primer"])
+exclusion_factor=float(configObject["Dimer_Exclusion_Factor"])
 
 with open(targets,'r') as handle:
     reader=csv.reader(handle,delimiter='\t')
@@ -189,7 +190,11 @@ def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
                 sorted_probe_list.append(probe_list[i])
                 sorted_nr_list.append(nr)
         nr_of_times=nr_of_times-1
-    most_conflicting_probe_list=sorted_probe_list[0:int(len(sorted_probe_list)/2)] #exclude the top half most dimer-forming proibes
+    amount_to_exlude=int(int(len(sorted_probe_list)*exclusion_factor))
+    if amount_to_exlude==0:
+        most_conflicting_probe_list=sorted_probe_list
+    else:
+        most_conflicting_probe_list=sorted_probe_list[0:int(len(sorted_probe_list)*exclusion_factor)] #exclude the top portion (top 10% if exclusion factor== 0.1
     most_conflicting_dimer_range_list=[]
     for probe in most_conflicting_probe_list: #report the conflicting locus at first occurrence of dimer
         index=conflicting_cpg_list_dimer.index(probe)
