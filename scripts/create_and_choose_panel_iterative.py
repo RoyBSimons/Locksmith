@@ -144,37 +144,6 @@ def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter,p
         index=possible_arm_combinations.index(probe[counter])
     return [probe[counter],probe_id_list[index]]
 
-def find_dimer_forming_probes(chosen_probes):
-    #Create a fasta file with the chosen probes
-    passed_list=[]
-    with open('tmp_fasta_chosen_probes.fasta','w') as handle:
-        for i,probe in enumerate(chosen_probes):
-            if probe ==None:
-                passed_list.append(i)
-            else:
-                handle.write('>'+str(i)+'\n')
-                handle.write(probe+'\n')
-    #test the chosen probes set for dimers
-    os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s 7 -t 10') #scores cut-off is 7, temperature minimum is 10 degrees
-    os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
-    dimers=[False for i in range(len(chosen_probes))]
-    with open('tmp_dimers_chosen_probes.json') as handle:
-        reader = json.load(handle)
-        jsonFile.close()
-        if reader==None:
-            pass
-        else:
-            for row in reader:
-                index1=int(row['S1']['ID'])
-                dimers[index1]=True
-                index2=int(row['S2']['ID'])
-                dimers[index2]=True
-    os.system('rm tmp_dimers_chosen_probes.json')
-    #obtain which probes form dimers --> No dimer=False, dimer=True
-    return dimers
-###################################
-###################################
-###################################
 def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
     probe_list=[]
     probe_list_count=[]
@@ -212,8 +181,75 @@ def get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dime
     combined_most_conflicting_dimer_range_list=most_conflicting_dimer_range_list+most_conflicting_dimer_range_list2
     return combined_most_conflicting_dimer_range_list
 
-def find_dimer_forming_probes_iterative(chosen_probes):
-    #Create a fasta file with the chosen probes
+def get_dimer_range_upstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer):
+    chrom=arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
+    start=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
+    end=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
+    template_strand=possible_arm_combinations_all_targets[probe_index][nested_index][-2]
+    dimer_start_range=max(start,start+dimer_start_num)
+    if template_strand=='+':
+        dimer_end_range=min(end,start+dimer_end_num)
+    else:
+        dimer_end_range=max(end,start+dimer_end_num)
+    dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
+    if dimer_start_range > dimer_end_range:
+        print('error '+str([dimer_start_range,dimer_end_range,dimer]))
+    return [dimer_range,template_strand]
+
+def get_dimer_range_downstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S_length,dimer):
+    chrom=arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
+    start=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
+    end=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
+    template_strand=possible_arm_combinations_all_targets[probe_index][nested_index][-2]
+    dimer_start_range=max(start,start+dimer_start_num-(S_length-(end-start+1)))
+    if template_strand=='+':
+        dimer_end_range=min(end,start+dimer_end_num-(S_length-(end-start+1)))
+    else:
+        dimer_end_range=max(end,start+dimer_end_num-(S_length-(end-start+1)))
+    dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
+    if dimer_start_range > dimer_end_range:
+        print('error '+str([dimer_start_range,dimer_end_range,dimer]))
+    return [dimer_range,template_strand]
+
+def write_nested_loci_to_bedfile(output_name,loci_list):
+    to_write_list=[[locus.split(':')[0],locus.split(':')[1].split('-')[0],locus.split('-')[1],'','',probe_arm_list[i][j][-2],str(i)+':'+str(j)] for i,row in enumerate(loci_list) for j,locus in enumerate(row)] #[chrom,start,end,i:j] e.g. [1,105386,105396,0:304] for chr1:105386-105396 in the locus at loci_list[0][304]
+    #to_write_list=[[locus.split(':')[0][4:],locus.split(':')[1].split('-')[0],locus.split('-')[1]] for i,row in enumerate(loci_list) for j,locus in enumerate(row)]
+    with open(output_name,'w') as handle:
+        writer=csv.writer(handle,delimiter='\t')
+        writer.writerows(to_write_list)
+    return output_name
+
+def write_loci_to_bedfile(output_name,loci_list):
+    to_write_list=[[locus[0].split(':')[0],locus[0].split(':')[1].split('-')[0],locus[0].split('-')[1],'','',locus[1],str(i)] for i,locus in enumerate(loci_list)] #[chrom,start,end,i] e.g. [1,105386,105396,0] for chr1:105386-105396 in the locus at loci_list[0]
+    #to_write_list=[[locus.split(':')[0][4:],locus.split(':')[1].split('-')[0],locus.split('-')[1]] for i,locus in enumerate(loci_list)]
+    with open(output_name,'w') as handle:
+        writer=csv.writer(handle,delimiter='\t')
+        writer.writerows(to_write_list)
+    return output_name
+
+def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up_bedfile_name,loci_down_bedfile_name,dimer_range_list,dimer_bedfile_name,bedfile_intersect_name):
+    write_nested_loci_to_bedfile(loci_up_bedfile_name,loci_list_up)
+    write_nested_loci_to_bedfile(loci_down_bedfile_name,loci_list_down)
+    write_loci_to_bedfile(dimer_bedfile_name,dimer_range_list)
+    #combine loci_down_bedfile_name and loci_up_bedfile_name
+    os.system('cat '+loci_up_bedfile_name+' '+loci_down_bedfile_name+' > '+outputdir+'combined.bed')
+    #Do bedtools intersect here on combined_loci_bedfile_name and dimer_bedfile_name
+    os.system('bedtools intersect -wa -s -a '+outputdir+'combined.bed -b '+dimer_bedfile_name+' -f 7E-9 > '+bedfile_intersect_name)
+    
+    #obtain identifier from bedfile_intersect_name
+    new_conflicting_indices_list=[]
+    with open(bedfile_intersect_name,'r') as handle:
+        reader=csv.reader(handle,delimiter='\t')
+        for row in reader:
+            identifier=row[-1]
+            i=identifier.split(':')[0]
+            j=identifier.split(':')[1]
+            new_conflicting_indices_list.append([i,j])
+    return new_conflicting_indices_list
+
+
+def rescore_dimer_forming_probes_iterative(chosen_probes):
+    start=time.time()#Create a fasta file with the chosen probes
     passed_list=[]
     with open('tmp_fasta_chosen_probes.fasta','w') as handle:
         for i,probe in enumerate(chosen_probes):
@@ -237,119 +273,58 @@ def find_dimer_forming_probes_iterative(chosen_probes):
     if dimerlist is None:
         pass
     else:
-        for dimer in dimerlist:
+        for dindex,dimer in enumerate(dimerlist):
                 cpg_id=dimer['S1']['ID']
                 cpg_id2=dimer['S2']['ID']
                 dimer_structure=dimer['Aseq']
                 S1_length=len(dimer['S1']['Seq'])
                 S2_length=len(dimer['S2']['Seq'])
                 #Obtain the location of the dimer on the two sequences
-                if dimer['S1Dangling']== 0:
-                    dimer_start_num=dimer['AseqDangling']
-                    dimer_end_num=dimer_start_num+len(dimer_structure)
-                    dimer_start_num2=dimer['AseqDangling']-dimer['S2Dangling']
-                    dimer_end_num2=dimer_start_num2+len(dimer_structure)
-                else:
-                    dimer_start_num=dimer['AseqDangling']-dimer['S1Dangling']
-                    dimer_end_num=dimer_start_num+len(dimer_structure)
-                    dimer_start_num2=dimer['S1Dangling']+dimer['AseqDangling']-dimer['S1Dangling']
-                    dimer_end_num2=dimer_start_num2+len(dimer_structure)
+                S1Dangling=dimer['S1Dangling']
+                AseqDangling=dimer['AseqDangling']
+                S2Dangling=dimer['S2Dangling']
+                dimer_start_num=AseqDangling-S1Dangling
+                dimer_end_num=dimer_start_num+len(dimer_structure)
+                dimer_start_num2=AseqDangling-S2Dangling
+                dimer_end_num2=dimer_start_num2+len(dimer_structure)
                 conflicting_cpg_list_dimer.append(cpg_id)
                 conflicting_cpg_list_dimer2.append(cpg_id2)
                 probe_index=probe_cpg_id_list.index(cpg_id.split(':')[0])
                 nested_index=probe_id_list[probe_index].index(cpg_id)
                 probe_index2=probe_cpg_id_list.index(cpg_id2.split(':')[0])
                 nested_index2=probe_id_list[probe_index2].index(cpg_id2)
-                S1_upstream_arm_length=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1][:-1])-int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0])+1
-                S1_downstream_arm_length=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1][:-1])-int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0])+1
-                S2_upstream_arm_length=int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1][:-1])-int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0])+1
-                S2_downstream_arm_length=int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1][:-1])-int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0])+1
-                #check whether the S1 and S2 sequences are 5' to 3' or the other way around.
-        #        print('\n')
-        #        print(dimer['S1']['Seq'][:S1_upstream_arm_length])
-        #        print(arm_upstream_loc_list[probe_id_list.index(cpg_id)])
-                if arm_upstream_list[probe_index][nested_index] in dimer['S1']['Seq'][:S1_upstream_arm_length]:
-        #            print('yes')
-                    dimer_start_num_corrected=dimer_start_num
-                    dimer_end_num_corrected=dimer_end_num
-
-                else: #In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
-                    dimer_start_num_corrected=S1_downstream_arm_length-(S1_length-dimer_start_num)
-                    dimer_end_num_corrected=S1_downstream_arm_length-(S1_length-dimer_end_num)
-                if arm_upstream_list[probe_index2][nested_index2] in dimer['S2']['Seq'][:S2_upstream_arm_length]:
-        #            print('yes2')
-                    dimer_start_num2_corrected=dimer_start_num2
-                    dimer_end_num2_corrected=dimer_end_num2
-                else: #In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
-                    dimer_start_num2_corrected=S2_length-dimer_end_num2
-                    dimer_end_num2_corrected=S2_length-dimer_start_num2
-
-        #The next two if statements only include the situation if dimer['S1Dangling']== 0: (or the other way around?)
-        #By this I mean that dimer_range should always give the arm at the start of the designed probe and dimer_range2 should always give the arm at the end of the probe. Although this is only the case if dimer['S1Dangling']== 0 AND both the S1 and S2 sequences are 5'-3'. Look into this.
                 #obtain the genomic locations of the dimer forming regions for S1
-                if arm_upstream_list[probe_index][nested_index] in dimer['S1']['Seq'][:S1_upstream_arm_length]: #Check whether the dimer was from 3'-5'
-        #            print('yes3')
-                    if dimer_start_num_corrected < backbone_length: #dimer is in upstream arm
-                        chrom=arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
-                        start=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num_corrected)
-                        dimer_end_range=min(end,start+dimer_end_num_corrected)
-                        dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                    else:   #dimer is in downstream arm
-                        chrom=arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
-                        start=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0]).strip("'")
-                        end=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num_corrected-(S1_length-(end-start+1)))
-                        dimer_end_range=min(end,start+dimer_end_num_corrected-(S1_length-(end-start+1)))
-                        dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                else:
-                    if dimer_start_num_corrected < backbone_length: #dimer is in upstream arm
-                        chrom=arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
-                        start=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num_corrected)
-                        dimer_end_range=min(end,start+dimer_end_num_corrected)
-                        dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                    else: #dimer is in downstream arm
-                        chrom=arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
-                        start=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num_corrected-(S1_length-(end-start+1)))
-                        dimer_end_range=min(end,start+dimer_end_num_corrected-(S1_length-(end-start+1)))
-                        dimer_range=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-            #obtain the genomic locations of the dimer forming regions for S2
-                if arm_upstream_list[probe_index2][nested_index2] in dimer['S2']['Seq'][:S2_upstream_arm_length]: #Check whether the dimer was from 3'-5'
-        #            print('yes4')
-                    if dimer_start_num2_corrected < backbone_length: #dimer is in upstream arm
-                        chrom=arm_upstream_loc_list[probe_index2][nested_index2].split(':')[0]
-                        start=int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num2_corrected)
-                        dimer_end_range=min(end,start+dimer_end_num2_corrected)
-                        dimer_range2=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                    else: #dimer is in downstream arm
-                        chrom=arm_downstream_loc_list[probe_index2][nested_index2].split(':')[0]
-                        start=int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num2_corrected-(S2_length-(end-start+1)))
-                        dimer_end_range=min(end,start+dimer_end_num2_corrected-(S2_length-(end-start+1)))
-                        dimer_range2=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                else: #If the sequence was obtained in 3'-5' from the dimer file, use downstream_loc_list
-                    if dimer_start_num2_corrected < backbone_length: #dimer is in upstream arm
-                        chrom=arm_upstream_loc_list[probe_index2][nested_index2].split(':')[0]
-                        start=int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_upstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num2_corrected)
-                        dimer_end_range=min(end,start+dimer_end_num2_corrected)
-                        dimer_range2=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
-                    else: #dimer is in downstream arm
-                        chrom=arm_downstream_loc_list[probe_index2][nested_index2].split(':')[0]
-                        start=int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[0].strip("'"))
-                        end=int(arm_downstream_loc_list[probe_index2][nested_index2].split(':')[1].split('-')[1].strip("'"))
-                        dimer_start_range=max(start,start+dimer_start_num2_corrected-(S2_length-(end-start+1)))
-                        dimer_end_range=min(end,start+dimer_end_num2_corrected-(S2_length-(end-start+1)))
-                        dimer_range2=str(chrom)+':'+str(dimer_start_range)+'-'+str(dimer_end_range)
+                #check whether the S1 and S2 sequences are 5' to 3' or the other way around.)
+                if arm_upstream_list[probe_index][nested_index].strip("'") in dimer['S1']['Seq'][:len(arm_upstream_list[probe_index][nested_index].strip("'"))]:
+                    if dimer_start_num < len(arm_upstream_list[probe_index][nested_index].strip("'")): #dimer is in upstream arm
+                        dimer_range=get_dimer_range_upstream(arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
+                    elif dimer_end_num >= S1_length-len(arm_downstream_list[probe_index][nested_index].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range=get_dimer_range_downstream(arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
+                    else: #dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
+                        pass
+                else: #In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
+                    dimer_start_num,dimer_end_num = S1_length-dimer_end_num , S1_length-dimer_start_num
+                    if dimer_start_num < len(arm_upstream_list[probe_index][nested_index].strip("'")): #dimer is in upstream arm
+                        dimer_range=get_dimer_range_upstream(arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
+                    elif dimer_end_num >= S1_length-len(arm_downstream_list[probe_index][nested_index].strip("'")): #dimer is in downstream arm If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range=get_dimer_range_downstream(arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
+                    else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
+                        pass
+                if arm_upstream_list[probe_index2][nested_index2].strip("'") in dimer['S2']['Seq'][:len(arm_upstream_list[probe_index2][nested_index2].strip("'"))]:
+                    if dimer_start_num2 < len(arm_upstream_list[probe_index2][nested_index2].strip("'")): #dimer is in upstream arm
+                        dimer_range2=get_dimer_range_upstream(arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
+                    elif dimer_end_num2 >= S2_length-len(arm_downstream_list[probe_index2][nested_index2].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range2=get_dimer_range_downstream(arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
+                    else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
+                        pass
+                else: #In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
+                    dimer_start_num2,dimer_end_num2 = S2_length-dimer_end_num2 , S2_length-dimer_start_num2
+                    if dimer_start_num2 < len(arm_upstream_list[probe_index2][nested_index2].strip("'")): #dimer is in upstream arm
+                        dimer_range2=get_dimer_range_upstream(arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
+                    elif dimer_end_num2 >= S2_length-len(arm_downstream_list[probe_index2][nested_index2].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range2=get_dimer_range_downstream(arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
+                    else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
+                        pass
                 conflict_range_dimer.append(dimer_range)
                 conflict_range_dimer2.append(dimer_range2)
 
@@ -359,59 +334,45 @@ def find_dimer_forming_probes_iterative(chosen_probes):
     #find all probes that have common regions with the most_conflicting_dimer_range and report those as conflicting probes
     all_conflicting_probe_list=[]
     conflicting_targets=set([])
-    for dimer_range in most_conflicting_dimer_range_list:
-        chrom=dimer_range.split(':')[0]
-        for i,row in enumerate(arm_downstream_loc_list):
-            for j,loc_d in enumerate(row):
-                chrom_loc_d=loc_d.split(':')[0]
-                if chrom_loc_d==chrom:
-                    start=int(loc_d.split(':')[1].split('-')[0].strip("'"))
-                    end=int(loc_d.split(':')[1].split('-')[1].strip("'"))
-                    dimer_start=int(dimer_range.split(':')[1].split('-')[0].strip("'"))
-                    dimer_end=int(dimer_range.split(':')[1].split('-')[1].strip("'"))
-                    #when there is more than 6 overlap report the probe as conflicting
-                    if start>=dimer_start and start<=dimer_end:
-                        overlap=dimer_end-start+1
-                    elif end>=dimer_start and end<=dimer_end:
-                        overlap=end-dimer_start+1
-                    else: #there is no overlap between the two
-                        overlap=0
-                    if overlap>6: #get this from config file
-                        all_conflicting_probe_list.append(probe_id_list[i][j])
-                        conflicting_targets.add(probe_id_list[i][0].split(':')[0])
-        for i,row in enumerate(arm_upstream_loc_list):
-            for j,loc_u in enumerate(row):
-                chrom_loc_u=loc_u.split(':')[0]
-                if chrom_loc_u==chrom:
-                    start=int(loc_u.split(':')[1].split('-')[0].strip("'"))
-                    end=int(loc_u.split(':')[1].split('-')[1].strip("'"))
-                    dimer_start=int(dimer_range.split(':')[1].split('-')[0].strip("'"))
-                    dimer_end=int(dimer_range.split(':')[1].split('-')[1].strip("'"))
-                    #when there is more than 6 overlap report the probe as conflicting
-                    if start>=dimer_start and start<=dimer_end:
-                        overlap=dimer_end-start+1
-                    elif end>=dimer_start and end<=dimer_end:
-                        overlap=end-dimer_start+1
-                    else: #there is no overlap between the two
-                        overlap=0
-                    if overlap>6: #get this from config file
-                        all_conflicting_probe_list.append(probe_id_list[i][j])
-                        conflicting_targets.add(probe_id_list[i][0].split(':')[0])
+    end_time_dimer=time.time()
+    print('Obtaining dimer ranges takes '+str(end_time_dimer-start_time_dimer)+ 'seconds')
+
+    start_t=time.time()    
+    loci_up_bedfile_name=outputdir+'loci_up.bed'
+    loci_down_bedfile_name=outputdir+'loci_down.bed'
+    dimer_bedfile_name=outputdir+'conflicting_dimer.bed'
+    bedfile_intersect_name=outputdir+'conflicting_loci.bed'
+    new_conflicting_indices_list=create_conflicting_indices_list_bedtools(arm_upstream_loc_list,arm_downstream_loc_list,loci_up_bedfile_name,loci_down_bedfile_name,most_conflicting_dimer_range_list,dimer_bedfile_name,bedfile_intersect_name)
+
+    end_t=time.time()
+    print('that one function takes '+str(end_t-start_t)+' seconds')
+    start_t=time.time()
+    all_conflicting_indices=[indices for indices_list in new_conflicting_indices_list for indices in indices_list]
+    end_t=time.time()
+    print('first loop takes '+str(end_t-start_t)+' seconds')
+    start_t=time.time()
+    for indexes in new_conflicting_indices_list:
+        i=int(indexes[0])
+        j=int(indexes[1])
+        all_conflicting_probe_list.append(probe_id_list[i][j])
+        conflicting_targets.add(probe_id_list[i][0].split(':')[0])
+        probe_scores[i][j]+=10^10 #Adjust score of conflicting probe
+    end_t=time.time()
+    print('second loop of List comprehension takes '+ str(end_t-start_t)+' seconds')
+
     return all_conflicting_probe_list,conflicting_targets
 
-
-##############################
-##############################
-##############################
 
 #-----------------------------------------------------------------------
 #Iteratively exclude the most dimer forming probes.
 chosen_probes_lists=[]
 probes_with_dimers_lists=[]
+conflicting_probe_list=[]
 counter=0
 seed=11 #move to config file
 min_dimers=len(possible_probes_all_targets)
 while counter<permutations and min_dimers>0:
+    start_big=time.time()
     #Choose random probe set
     # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
     pool=mp.Pool(nr_of_cores)
@@ -421,24 +382,14 @@ while counter<permutations and min_dimers>0:
     print('\tRound '+str(counter)+' :Probes chosen')
     
     chosen_probes_lists.append(chosen_probes)
-    probes_with_dimers,conflicting_targets=find_dimer_forming_probes_iterative(chosen_probes)
+    probes_with_dimers,conflicting_targets=rescore_dimer_forming_probes_iterative(chosen_probes)
     nr_of_dimer_probes=len(conflicting_targets)
     probes_with_dimers_lists.append(nr_of_dimer_probes)
+    conflicting_probe_list.append(probes_with_dimers)
     print('\t'+str(nr_of_dimer_probes)+' out of '+str(len(chosen_probes))+' probes form a dimer')
     min_dimers=min(nr_of_dimer_probes,min_dimers)
-    
-    #Find hairpins
-    
-
-    #exclude probes that form hairpins from being chosen
-    for probe in probes_with_dimers:
-        probe_index=probe_cpg_id_list.index(probe.split(':')[0])
-        nested_index=probe_id_list[probe_index].index(probe)
-        probe_scores[probe_index][nested_index]+=10^10
-    #exclude probes that form dimers from being chosen (try around with e.g. top 25% or top 1)
-    
-
     counter+=1
+
 chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
 chosen_set=chosen_probes_lists[chosen_set_index]
 seq_list=[]
