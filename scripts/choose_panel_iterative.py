@@ -124,21 +124,23 @@ with open(probe_arms_file,'rb') as handle:
             arm_downstream_list[i].append(probe[1])
 
 def get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_array):
-    probe_score=np.add(np.add(np.add(np.multiply(hairpin_array,int(10^10)),CpG_conflicts),SNP_conflicts),tms)
+    probe_score=np.add(np.add(np.add(np.add(np.multiply(hairpin_array,int(10**10)),CpG_conflicts),SNP_conflicts),np.array(tms)),1)#Score is at least 1
     return probe_score
 
 probe_scores=get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
 print('\tProbe scores computed')
-def choose_probes_from_scores(probe_scores,possible_arm_combinations,n,counter,probe_id_list,seed):
+def choose_probes_from_scores(probe_costs,possible_arm_combinations,n,counter,probe_id_list,seed):
     np.random.seed(seed)
-    if probe_scores.size==0:
+    if probe_costs.size==0:
         return
     else:
+        probe_costs=[float(i) for i in probe_costs]
+        probe_scores=1/np.array(probe_costs)
         sum_score=sum(probe_scores)
         if sum_score==0: #If all scores are 0, there should still be a probability to choose one of the probes
             probability_distribution=[1/len(probe_scores) for i in probe_scores]
         else:
-            probability_distribution=[i/sum_score for i in probe_scores]
+            probability_distribution=probe_scores/sum_score
         probe= choice(possible_arm_combinations,n,p=probability_distribution)
         index=possible_arm_combinations.index(probe[counter])
     return [probe[counter],probe_id_list[index]]
@@ -247,7 +249,7 @@ def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up
     return new_conflicting_indices_list
 
 
-def rescore_dimer_forming_probes_iterative(chosen_probes):#Create a fasta file with the chosen probes
+def rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a fasta file with the chosen probes
     passed_list=[]
     with open('tmp_fasta_chosen_probes.fasta','w') as handle:
         for i,probe in enumerate(chosen_probes):
@@ -345,8 +347,8 @@ def rescore_dimer_forming_probes_iterative(chosen_probes):#Create a fasta file w
         j=int(indexes[1])
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
-        probe_scores[i][j]+=10^10 #Adjust score of conflicting probe
-    return all_conflicting_probe_list,conflicting_targets
+        probe_scores[i][j]=probe_scores[i][j]+float(10**10) #Adjust score of conflicting probe
+    return all_conflicting_probe_list,conflicting_targets,probe_scores
 
 
 #-----------------------------------------------------------------------
@@ -367,7 +369,7 @@ while counter<permutations and min_dimers>0:
     print('\tRound '+str(counter)+' :Probes chosen')
     
     chosen_probes_lists.append(chosen_probes)
-    probes_with_dimers,conflicting_targets=rescore_dimer_forming_probes_iterative(chosen_probes)
+    probes_with_dimers,conflicting_targets,probe_scores=rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores)
     nr_of_dimer_probes=len(conflicting_targets)
     probes_with_dimers_lists.append(nr_of_dimer_probes)
     conflicting_probe_list.append(probes_with_dimers)
