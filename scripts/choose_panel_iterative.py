@@ -196,9 +196,9 @@ def get_dimer_range_upstream(arm_loc_list,probe_index,nested_index,dimer_start_n
     return [dimer_range,template_strand]
 
 def get_dimer_range_downstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S_length,dimer):
-    chrom=arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
-    start=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
-    end=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
+    chrom=arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
+    start=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
+    end=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
     template_strand=possible_arm_combinations_all_targets[probe_index][nested_index][-2]
     dimer_start_range=max(start,start+dimer_start_num-(S_length-(end-start+1)))
     if template_strand=='+':

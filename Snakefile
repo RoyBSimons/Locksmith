@@ -43,11 +43,16 @@ rule create_probes:
                 hairpins=config['output_directory']+"/hairpin_scores.csv",
                 snp=config['output_directory']+"/SNP_conflicts.csv",
 		arms=config['output_directory']+"/probe_arms.csv"
+
+	log:
+		out = config['output_directory']+"/logs/create_probes_stdout.log",
+		err = config['output_directory']+"/logs/create_probes_stderr.err"
+
 	shell:
-		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]}"
+		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]} 2> {log.err} 1> {log.out}"
 #--------------------------------------------------------------------------------------------------
 #STEP 3
-rule create_and_choose_panel_iteratively:
+rule choose_panel_iteratively:
         input:
                 config_file=config['output_directory']+"/config.json",
                 tms=config['output_directory']+"/tms.csv",
@@ -57,9 +62,15 @@ rule create_and_choose_panel_iteratively:
                 snp=config['output_directory']+"/SNP_conflicts.csv",
 		arms=config['output_directory']+"/probe_arms.csv",
                 target=config['output_directory']+"/target_list_range.bed"
-        output:
+
+	output:
                 fasta=config['output_directory']+"/chosen_panel_iterative.fasta",
 		conflicts=config['output_directory']+"/conflicting_probes_per_iteration.csv"
-        shell:
-                "python scripts/create_and_choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts}"
+
+	log:
+		out = config['output_directory']+"/logs/choose_panel_iteratively_stdout.log",
+		err = config['output_directory']+"/logs/choose_panel_iteratively_stderr.err"
+
+	shell:
+                "python scripts/choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} 2> {log.err} 1> {log.out}"
 
