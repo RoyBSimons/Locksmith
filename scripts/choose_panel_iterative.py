@@ -54,6 +54,7 @@ with open(config_file) as jsonFile:
 permutations=int(configObject['Permutations'])
 backbone_length=len(configObject["Backbone_sequence"][0]["Reverse_complement_universal_forward_primer"])+len(configObject["Backbone_sequence"][0]["Common_region"])+len(configObject["Backbone_sequence"][0]["Universal_reverse_primer"])
 exclusion_factor=float(configObject["Dimer_Exclusion_Factor"])
+seed=int(configObject['Seed'])
 
 with open(targets,'r') as handle:
     reader=csv.reader(handle,delimiter='\t')
@@ -362,7 +363,6 @@ chosen_probes_lists=[]
 probes_with_dimers_lists=[]
 conflicting_probe_list=[]
 counter=0
-seed=11 #move to config file
 min_dimers=len(possible_probes_all_targets)
 while counter<permutations and min_dimers>0:
     #Choose random probe set

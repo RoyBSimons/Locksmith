@@ -218,7 +218,7 @@ def target_bed_to_bed_37(bedpath):
 def obtain_SNPs(probe_list,bedpath,freq_threshold):
     #first obtain frequent SNPs in targets
     new_path=target_bed_to_bed_37(bedpath)
-    os.system('tabix '+ftp_path_snp_database+' -R '+new_path+' > tmp_output_snp') #put this FTP URL in the config file?
+    os.system('tabix '+ftp_path_snp_database+' -R '+new_path+' > tmp_output_snp')
     chr_list=[]
     loc_list=[]
     freq_threshold=1.0-freq_threshold
