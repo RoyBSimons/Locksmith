@@ -145,7 +145,7 @@ def choose_probes_from_scores(probe_costs,possible_arm_combinations,n,counter,pr
         index=possible_arm_combinations.index(probe[counter])
     return [probe[counter],probe_id_list[index]]
 
-def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
+def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer):
     probe_list=[]
     probe_list_count=[]
     for probe in conflicting_cpg_list_dimer: #only look into the first mentioned probes when forming a dimer
@@ -165,11 +165,14 @@ def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
                 sorted_probe_list.append(probe_list[i])
                 sorted_nr_list.append(nr)
         nr_of_times=nr_of_times-1
-    amount_to_exlude=int(int(len(sorted_probe_list)*exclusion_factor))
+    if exclusion_factor==float(2):
+        amount_to_exlude=1
+    else:
+        amount_to_exlude=int(int(len(sorted_probe_list)*exclusion_factor))
     if amount_to_exlude==0:
         most_conflicting_probe_list=sorted_probe_list
     else:
-        most_conflicting_probe_list=sorted_probe_list[0:int(len(sorted_probe_list)*exclusion_factor)] #exclude the top portion (top 10% if exclusion factor== 0.1
+        most_conflicting_probe_list=sorted_probe_list[0:amount_to_exlude] #exclude the top portion (top 10% if exclusion factor== 0.1
     most_conflicting_dimer_range_list=[]
     for probe in most_conflicting_probe_list: #report the conflicting locus at first occurrence of dimer
         index=conflicting_cpg_list_dimer.index(probe)
@@ -177,9 +180,9 @@ def get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer):
     return most_conflicting_dimer_range_list
 
 def get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2):
-    most_conflicting_dimer_range_list=get_conflict_ranges_S1(conflicting_cpg_list_dimer,conflict_range_dimer)
-    most_conflicting_dimer_range_list2=get_conflict_ranges_S1(conflicting_cpg_list_dimer2,conflict_range_dimer2)
-    combined_most_conflicting_dimer_range_list=most_conflicting_dimer_range_list+most_conflicting_dimer_range_list2
+    combined_conflicting_cpg_list_dimer=conflicting_cpg_list_dimer+conflicting_cpg_list_dimer2
+    combined_conflict_range_dimer=conflict_range_dimer+conflict_range_dimer2
+    combined_most_conflicting_dimer_range_list=get_conflict_ranges(combined_conflicting_cpg_list_dimer,combined_conflict_range_dimer)
     return combined_most_conflicting_dimer_range_list
 
 def get_dimer_range_upstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer):
@@ -270,12 +273,15 @@ def rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a
     conflicting_cpg_list_dimer2=[]
     conflict_range_dimer=[]
     conflict_range_dimer2=[]
+    cpgs_of_dimer_forming_probes=set([])
     if dimerlist is None:
         pass
     else:
         for dindex,dimer in enumerate(dimerlist):
                 cpg_id=dimer['S1']['ID']
                 cpg_id2=dimer['S2']['ID']
+                cpgs_of_dimer_forming_probes.add(cpg_id)
+                cpgs_of_dimer_forming_probes.add(cpg_id2)
                 dimer_structure=dimer['Aseq']
                 S1_length=len(dimer['S1']['Seq'])
                 S2_length=len(dimer['S2']['Seq'])
@@ -340,15 +346,14 @@ def rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a
     dimer_bedfile_name=outputdir+'conflicting_dimer.bed'
     bedfile_intersect_name=outputdir+'conflicting_loci.bed'
     new_conflicting_indices_list=create_conflicting_indices_list_bedtools(arm_upstream_loc_list,arm_downstream_loc_list,loci_up_bedfile_name,loci_down_bedfile_name,most_conflicting_dimer_range_list,dimer_bedfile_name,bedfile_intersect_name)
-    print('Conflicts found')
-    all_conflicting_indices=[indices for indices_list in new_conflicting_indices_list for indices in indices_list]
     for indexes in new_conflicting_indices_list:
         i=int(indexes[0])
         j=int(indexes[1])
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
         probe_scores[i][j]=probe_scores[i][j]+float(10**10) #Adjust score of conflicting probe
-    return all_conflicting_probe_list,conflicting_targets,probe_scores
+    print(str(len(conflicting_targets))+' conflicts found')
+    return all_conflicting_probe_list,conflicting_targets,probe_scores,cpgs_of_dimer_forming_probes
 
 
 #-----------------------------------------------------------------------
@@ -369,8 +374,8 @@ while counter<permutations and min_dimers>0:
     print('\tRound '+str(counter)+' :Probes chosen')
     
     chosen_probes_lists.append(chosen_probes)
-    probes_with_dimers,conflicting_targets,probe_scores=rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores)
-    nr_of_dimer_probes=len(conflicting_targets)
+    probes_with_dimers,conflicting_targets,probe_scores,cpgs_of_dimer_forming_probes=rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores)
+    nr_of_dimer_probes=len(cpgs_of_dimer_forming_probes)
     probes_with_dimers_lists.append(nr_of_dimer_probes)
     conflicting_probe_list.append(probes_with_dimers)
     print('\t'+str(nr_of_dimer_probes)+' out of '+str(len(chosen_probes))+' probes form a dimer')
