@@ -123,13 +123,13 @@ with open(probe_arms_file,'rb') as handle:
             arm_upstream_list[i].append(probe[0])
             arm_downstream_list[i].append(probe[1])
 
-def get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_array):
-    probe_score=np.add(np.add(np.add(np.add(np.multiply(hairpin_array,int(10**10)),CpG_conflicts),SNP_conflicts),np.array(tms)),1)#Score is at least 1
-    return probe_score
+def get_probe_costs_array(tms,CpG_conflicts,SNP_conflicts,hairpin_array):
+    probe_cost=np.add(np.add(np.add(np.add(np.multiply(hairpin_array,int(10**10)),CpG_conflicts),SNP_conflicts),np.array(tms)),1)#Score is at least 1
+    return probe_cost
 
-probe_scores=get_probe_scores_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
-print('\tProbe scores computed')
-def choose_probes_from_scores(probe_costs,possible_arm_combinations,n,counter,probe_id_list,seed):
+probe_costs=get_probe_costs_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
+print('\tProbe costs computed')
+def choose_probes_from_costs(probe_costs,possible_arm_combinations,n,counter,probe_id_list,seed):
     np.random.seed(seed)
     if probe_costs.size==0:
         return
@@ -252,7 +252,7 @@ def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up
     return new_conflicting_indices_list
 
 
-def rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a fasta file with the chosen probes
+def increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a fasta file with the chosen probes
     passed_list=[]
     with open('tmp_fasta_chosen_probes.fasta','w') as handle:
         for i,probe in enumerate(chosen_probes):
@@ -351,9 +351,9 @@ def rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a
         j=int(indexes[1])
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
-        probe_scores[i][j]=probe_scores[i][j]+float(10**10) #Adjust score of conflicting probe
+        probe_costs[i][j]=probe_costs[i][j]+float(10**10) #Adjust cost of conflicting probe
     print(str(len(conflicting_targets))+' conflicts found')
-    return all_conflicting_probe_list,conflicting_targets,probe_scores,cpgs_of_dimer_forming_probes
+    return all_conflicting_probe_list,conflicting_targets,probe_costs,cpgs_of_dimer_forming_probes
 
 
 #-----------------------------------------------------------------------
@@ -369,12 +369,12 @@ while counter<permutations and min_dimers>0:
     # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
     pool=mp.Pool(nr_of_cores)
     chosen_probes=[]
-    chosen_probes=[pool.apply(choose_probes_from_scores,args=(probe_scores[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the score
+    chosen_probes=[pool.apply(choose_probes_from_costs,args=(probe_costs[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the cost
     pool.close()
     print('\tRound '+str(counter)+' :Probes chosen')
     
     chosen_probes_lists.append(chosen_probes)
-    probes_with_dimers,conflicting_targets,probe_scores,cpgs_of_dimer_forming_probes=rescore_dimer_forming_probes_iterative(chosen_probes,probe_scores)
+    probes_with_dimers,conflicting_targets,probe_costs,cpgs_of_dimer_forming_probes=increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_costs)
     nr_of_dimer_probes=len(cpgs_of_dimer_forming_probes)
     probes_with_dimers_lists.append(nr_of_dimer_probes)
     conflicting_probe_list.append(probes_with_dimers)
