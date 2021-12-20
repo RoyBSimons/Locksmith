@@ -13,7 +13,7 @@ rule copy_config_to_output_directory:
 #STEP 1: GET TARGET SEQUENCES
 rule create_bed_file_range:
 	input:
-		target="data/target_list.bed",
+		target=config['target_list_bedfile_path'],
 		c=config['output_directory']+"/config.json"
 	output:
 		config['output_directory']+"/target_list_range.bed"

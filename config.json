@@ -1,4 +1,5 @@
 {
+    "target_list_bedfile_path" : "/data/target_list.bed",
     "output_directory" : "output",
     "cpg_bed_path" : "data/hg38/CpG_IDs/chr*",
     "PATH_to_genome_database_directory" : "/media/disk3/roy/genomes/hg38/hg38_chromosomes",
