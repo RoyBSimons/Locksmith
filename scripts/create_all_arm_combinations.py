@@ -9,51 +9,102 @@ import multiprocessing as mp
 import csv
 import numpy as np
 import pickle
-#parse all files
-parser = ArgumentParser()
-parser.add_argument("-i", "--input", dest="filename",
+import time
+
+def main():
+    parser = get_arg_parser()
+    args = vars(parser.parse_args())
+    filename=args["filename"]
+    bedfile=args["bedfile"]
+    outputdir=args["output_dir"]+'/'
+    config_file=args["config_file"]
+    nr_of_cores=int(args["cores"])
+    ftp_path_snp_database,probe_specifics,min_arm_length,max_arm_length,min_target_length,max_target_length,target_range,cpg_flanks,max_CG_percentage,min_CG_percentage,backbone_sequence,mid_loc,freq_threshold = import_config(config_file)
+    start=time.time()
+    cpg_id_list=[]
+    with open(bedfile,'r') as handle:
+        reader=csv.reader(handle, delimiter='\t')
+        for row in reader:
+            cpg_id_list.append(row[3])
+    with open(filename) as handle:
+        pool=mp.Pool(nr_of_cores)#mp.cpu_count())
+        possible_arm_combinations_all_targets=[pool.apply(create_all_possible_arms_both_strands,args=(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_target_length,max_CG_percentage,cpg_flanks,mid_loc,cpg_id_list[i])) for i,record in enumerate(SeqIO.parse(handle,"fasta"))]
+        pool.close()
+    end=time.time()
+    print(end-start)
+    print('All possible arms obtained')
+    start=time.time()
+    #Array method instead of parallelization in order to calculate Tms faster
+    tms=get_delta_Tm_array(possible_arm_combinations_all_targets)
+    end=time.time()
+    print(end-start)
+    print('\tTms obtained')
+    start=time.time()
+    CpG_conflicts=report_CpGs_in_arms(possible_arm_combinations_all_targets)
+    end=time.time()
+    print(end-start)
+    print('\tCpGs in arms counted')
+    start=time.time()
+    possible_probes_all_targets=add_backbone_array(possible_arm_combinations_all_targets,backbone_sequence)
+    end=time.time()
+    print(end-start)
+    print('\tBackbone added')
+    start=time.time()
+    fasta_name='temp_test_fasta'
+    outputname_json='temp_test_json'
+    pool=mp.Pool(nr_of_cores)
+    hairpin_scores=[pool.apply(check_probe_for_hairpin_score,args=(possible_probes,fasta_name,outputname_json,index)) for index,possible_probes in enumerate(possible_probes_all_targets)]
+    pool.close()
+    end=time.time()
+    print(end-start)
+    print('\tHairpins detected')
+    start=time.time()
+    SNP_conflicts=obtain_SNPs(possible_arm_combinations_all_targets,bedfile,freq_threshold,ftp_path_snp_database)
+    end=time.time()
+    print(end-start)
+    print('\tSNPs in arms counted')
+    create_output_files(outputdir,tms,CpG_conflicts,possible_probes_all_targets,hairpin_scores,SNP_conflicts,possible_arm_combinations_all_targets) 
+
+def get_arg_parser():
+    #parse all files
+    parser = ArgumentParser()
+    parser.add_argument("-i", "--input", dest="filename",
                     help="open FILE", metavar="FILE")
-parser.add_argument("-o", "--output", dest="output_dir",
+    parser.add_argument("-o", "--output", dest="output_dir",
                     help="Directory for output", metavar="OUTPUTDIR")
-parser.add_argument("-c", "--config_file", dest="config_file",
+    parser.add_argument("-c", "--config_file", dest="config_file",
                     help="Config file with probe specifics", metavar="JSONfile")
-parser.add_argument("-b", "--bed", dest="bedfile",
+    parser.add_argument("-b", "--bed", dest="bedfile",
                     help="Bed file containing the targets", metavar="BED")
-parser.add_argument("-t", "--cores", dest="cores",
+    parser.add_argument("-t", "--cores", dest="cores",
                     help="Passed amount of cores to script", metavar="Cores")
-args = vars(parser.parse_args())
+    return parser
 
-filename=args["filename"]
-bedfile=args["bedfile"]
-outputdir=args["output_dir"]+'/'
-config_file=args["config_file"]
-nr_of_cores=int(args["cores"])
-
-#import config file
-with open(config_file) as jsonFile:
-    configObject = json.load(jsonFile)
-    jsonFile.close()
-ftp_path_snp_database=configObject['ftp_path_snp_database']
-probe_specifics=configObject['probe_specifics'][0]
-min_arm_length=probe_specifics['min_arm_length']
-max_arm_length=probe_specifics['max_arm_length']
-min_target_length=probe_specifics['min_target_length']
-max_target_length=probe_specifics['max_target_length']
-target_range=configObject['target_range']
-cpg_flanks=probe_specifics['cpg_flanks']
-max_CG_percentage=float(probe_specifics['max_CG_percentage'])
-min_CG_percentage=float(probe_specifics['min_CG_percentage'])
-
-#patch backbone together
-Backbone=configObject['Backbone_sequence'][0]
-rev_compl_univeral_forward_primer=Backbone['Reverse_complement_universal_forward_primer']
-common_region=Backbone['Common_region']
-univeral_reverse_primer=Backbone['Universal_reverse_primer']
-backbone_sequence=rev_compl_univeral_forward_primer+common_region+univeral_reverse_primer
-
-mid_loc=int(target_range)+1 #The middle nucleotide is the target range +1 because the total target is created by adding the target range on both sides.
-freq_threshold=float(configObject['SNP_frequency_threshold'])
-
+def import_config(config_file): #import config file
+    with open(config_file) as jsonFile:
+        configObject = json.load(jsonFile)
+        jsonFile.close()
+    ftp_path_snp_database=configObject['ftp_path_snp_database']
+    probe_specifics=configObject['probe_specifics'][0]
+    min_arm_length=probe_specifics['min_arm_length']
+    max_arm_length=probe_specifics['max_arm_length']
+    min_target_length=probe_specifics['min_target_length']
+    max_target_length=probe_specifics['max_target_length']
+    target_range=configObject['target_range']
+    cpg_flanks=probe_specifics['cpg_flanks']
+    max_CG_percentage=float(probe_specifics['max_CG_percentage'])
+    min_CG_percentage=float(probe_specifics['min_CG_percentage'])
+    
+    #patch backbone together
+    Backbone=configObject['Backbone_sequence'][0]
+    rev_compl_univeral_forward_primer=Backbone['Reverse_complement_universal_forward_primer']
+    common_region=Backbone['Common_region']
+    univeral_reverse_primer=Backbone['Universal_reverse_primer']
+    backbone_sequence=rev_compl_univeral_forward_primer+common_region+univeral_reverse_primer
+    
+    mid_loc=int(target_range)+1 #The middle nucleotide is the target range +1 because the total target is created by adding the target range on both sides.
+    freq_threshold=float(configObject['SNP_frequency_threshold'])
+    return ftp_path_snp_database,probe_specifics,min_arm_length,max_arm_length,min_target_length,max_target_length,target_range,cpg_flanks,max_CG_percentage,min_CG_percentage,backbone_sequence,mid_loc,freq_threshold    
 #--------------------------------------------------------------
 def create_all_possible_arms(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_CG_percentage,max_CG_percentage,cpg_flanks,mid_loc):
     probe_list=[]
@@ -133,9 +184,6 @@ def create_all_possible_arms_both_strands(record,min_target_length,max_target_le
                     i+=1
                     probe_list.append(probe)
     return probe_list
-with open(filename) as handle:
-    for record in SeqIO.parse(handle,"fasta"):
-        pass
 
 def get_delta_Tm_array(probe_arms_array):
     Tm_array=[]
@@ -215,7 +263,7 @@ def target_bed_to_bed_37(bedpath):
         writer.writerows(bed_info_list)
     return new_path
 
-def obtain_SNPs(probe_list,bedpath,freq_threshold):
+def obtain_SNPs(probe_list,bedpath,freq_threshold,ftp_path_snp_database):
     #first obtain frequent SNPs in targets
     new_path=target_bed_to_bed_37(bedpath)
     os.system('tabix '+ftp_path_snp_database+' -R '+new_path+' > tmp_output_snp')
@@ -237,9 +285,6 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
                         loc_list.append([locus])
     os.system('rm tmp_output_snp')
     SNP_count=[[0 for probe in probe_arms] for probe_arms in probe_list]
-    #first create a bedfile containing each of the arms
-    arm1list=[]
-    arm2list=[]
     for i,probe_arms in enumerate(probe_list):
         for j,probe in enumerate(probe_arms):
             arm1=loci_to_bed_37(probe[2])
@@ -254,58 +299,32 @@ def obtain_SNPs(probe_list,bedpath,freq_threshold):
                     if locus in range(int(arm2[1]),int(arm2[2])+1): #check whether the SNP is in the arm
                         SNP_count[i][j]+=1
     return SNP_count
-#----------------------------------------------------------------------------------------------------------
-
-cpg_id_list=[]
-with open(bedfile,'r') as handle:
-    reader=csv.reader(handle, delimiter='\t')
-    for row in reader:
-        cpg_id_list.append(row[3])
-print(cpg_id_list)
-with open(filename) as handle:
-    pool=mp.Pool(nr_of_cores)#mp.cpu_count())
-    possible_arm_combinations_all_targets=[pool.apply(create_all_possible_arms_both_strands,args=(record,min_target_length,max_target_length,min_arm_length,max_arm_length,min_target_length,max_CG_percentage,cpg_flanks,mid_loc,cpg_id_list[i])) for i,record in enumerate(SeqIO.parse(handle,"fasta"))]
-    pool.close()
-print('All possible arms obtained')
-#Array method instead of parallelization in order to calculate Tms faster
-tms=get_delta_Tm_array(possible_arm_combinations_all_targets)
-print('\tTms obtained')
-CpG_conflicts=report_CpGs_in_arms(possible_arm_combinations_all_targets)
-print('\tCpGs in arms counted')
-possible_probes_all_targets=add_backbone_array(possible_arm_combinations_all_targets,backbone_sequence)
-print('\tBackbone added')
-fasta_name='temp_test_fasta'
-outputname_json='temp_test_json'
-pool=mp.Pool(nr_of_cores)
-hairpin_scores=[pool.apply(check_probe_for_hairpin_score,args=(possible_probes,fasta_name,outputname_json,index)) for index,possible_probes in enumerate(possible_probes_all_targets)]
-pool.close()
-print('\tHairpins detected')
-
-SNP_conflicts=obtain_SNPs(possible_arm_combinations_all_targets,bedfile,freq_threshold)
-print('\tSNPs in arms counted')
 
 #------------------------------------------------------ Store all information from the prossible probes into files
-#with open(outputdir+'possible_arm_combinations_all_targets.csv', 'w') as file:
-#    for item in possible_arm_combinations_all_targets:
-#            file.write(",".join(map(str,item)))
-#            file.write("\n")
-with open(outputdir+'tms.csv', 'wb') as file:
-    pickle.dump(tms,file)
-with open(outputdir+'CpG_conflicts.csv', 'w') as file:
-    for item in CpG_conflicts:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
-with open(outputdir+'possible_probes_all_targets.csv', 'w') as file:
-    for item in possible_probes_all_targets:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
-with open(outputdir+'hairpin_scores.csv', 'w') as file:
-    for item in hairpin_scores:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
-with open(outputdir+'SNP_conflicts.csv', 'w') as file:
-    for item in SNP_conflicts:
-            file.write(",".join(map(str,item)))
-            file.write("\n")
-with open(outputdir+'probe_arms.csv','wb') as file:
-    pickle.dump(possible_arm_combinations_all_targets,file)
+def create_output_files(outputdir,tms,CpG_conflicts,possible_probes_all_targets,hairpin_scores,SNP_conflicts,possible_arm_combinations_all_targets):
+    start=time.time()
+    with open(outputdir+'tms.csv', 'wb') as file:
+        pickle.dump(tms,file)
+    with open(outputdir+'CpG_conflicts.csv', 'w') as file:
+        for item in CpG_conflicts:
+                file.write(",".join(map(str,item)))
+                file.write("\n")
+    with open(outputdir+'possible_probes_all_targets.csv', 'w') as file:
+        for item in possible_probes_all_targets:
+                file.write(",".join(map(str,item)))
+                file.write("\n")
+    with open(outputdir+'hairpin_scores.csv', 'w') as file:
+        for item in hairpin_scores:
+                file.write(",".join(map(str,item)))
+                file.write("\n")
+    with open(outputdir+'SNP_conflicts.csv', 'w') as file:
+        for item in SNP_conflicts:
+                file.write(",".join(map(str,item)))
+                file.write("\n")
+    with open(outputdir+'probe_arms.csv','wb') as file:
+        pickle.dump(possible_arm_combinations_all_targets,file)    
+    end=time.time()
+    print(end-start)
+
+if __name__ == '__main__':
+    main()

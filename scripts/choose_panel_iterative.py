@@ -9,127 +9,182 @@ from numpy.random import choice
 import csv
 import numpy as np
 import pickle
-parser = ArgumentParser()
-parser.add_argument("-o", "--output", dest="output_name",
-                    help="Fasta file which will contain the chosen probes as output", metavar="OUTPUTNAME")
-parser.add_argument("-c", "--config_file", dest="config_file",
-                    help="Config file with probe specifics", metavar="JSONfile")
-parser.add_argument("-m", "--tms", dest="tms",
-                    help="csv file containing probe binding temperatures", metavar="TMS")
-parser.add_argument("-g", "--cpg", dest="cpg",
-                    help="csv file containing amount of cpgs in probe arms", metavar="CPG")
-parser.add_argument("-p", "--probes", dest="probes",
-                    help="csv file containing the full probes", metavar="PROBES")
-parser.add_argument("-a", "--hairpins", dest="hairpins",
-                    help="csv file containing hairpins of probes", metavar="HAIRPINS")
-parser.add_argument("-n", "--snp", dest="snps",
-                    help="csv file containing amount of snps in probe arms", metavar="SNPS")
-parser.add_argument("-r", "--targets", dest="targets",
-                    help="Bedfile containing the targets to capture", metavar="BED")
-parser.add_argument("-b", "--arms", dest="probe_arms_file",
-                    help="csv file containing probe arms", metavar="ARMS")
-parser.add_argument("-t", "--cores", dest="cores",
-                    help="Passed amount of cores to script", metavar="Cores")
-parser.add_argument("-u", "--output_dir", dest="output_dir",
-                    help="Directory for output", metavar="OUTPUTDIR")
-parser.add_argument("-f", "--conflicting_output_file", dest="conflicting_file",
-                    help="Output filename for conflicting probes per iteration", metavar="CONFLICTS")
-args = vars(parser.parse_args())
 
-output_name=args["output_name"]
-config_file=args["config_file"]
-tms_file=args['tms']
-cpgs=args['cpg']
-probes=args['probes']
-hairpins=args['hairpins']
-snps=args['snps']
-targets=args['targets']
-probe_arms_file=args['probe_arms_file']
-nr_of_cores=int(args["cores"])
-outputdir=args["output_dir"]+'/'
-conflicting_file=args["conflicting_file"]
-with open(config_file) as jsonFile:
-    configObject = json.load(jsonFile)
-    jsonFile.close()
-permutations=int(configObject['Permutations'])
-backbone_length=len(configObject["Backbone_sequence"][0]["Reverse_complement_universal_forward_primer"])+len(configObject["Backbone_sequence"][0]["Common_region"])+len(configObject["Backbone_sequence"][0]["Universal_reverse_primer"])
-exclusion_factor=float(configObject["Dimer_Exclusion_Factor"])
-seed=int(configObject['Seed'])
+def main():
+    parser = get_arg_parser()
+    args = vars(parser.parse_args())
+    output_name=args["output_name"]
+    config_file=args["config_file"]
+    tms_file=args['tms']
+    cpgs=args['cpg']
+    probes=args['probes']
+    hairpins=args['hairpins']
+    snps=args['snps']
+    targets=args['targets']
+    probe_arms_file=args['probe_arms_file']
+    nr_of_cores=int(args["cores"])
+    outputdir=args["output_dir"]+'/'
+    conflicting_file=args["conflicting_file"]
 
-with open(targets,'r') as handle:
-    reader=csv.reader(handle,delimiter='\t')
-    probe_cpg_id_list=[]
-    for row in reader:
-        probe_cpg_id_list.append(row[3])
+    permutations,backbone_length,exclusion_factor,seed = import_config(config_file)
 
-with open(probes, 'r') as handle:
-    reader=csv.reader(handle)
-    possible_probes_all_targets=[]
-    for i,row in enumerate(reader):
-        possible_probes_all_targets.append([])
-        for probe in row:
-            possible_probes_all_targets[i].append(probe)
-with open(tms_file, 'rb') as handle:
-    tms=pickle.load(handle)
-    tms=np.array(tms,dtype=object)
-with open(cpgs, 'r') as handle:
-    reader=csv.reader(handle)
-    CpG_conflicts=[]
-    for i,row in enumerate(reader):
-        cpg_conflict_list=[]
-        for probe in row:
-            cpg_conflict_list.append(int(probe))
-        CpG_conflicts.append(np.array(cpg_conflict_list,dtype=object))
-    CpG_conflicts=np.array(CpG_conflicts,dtype=object)
+    probe_cpg_id_list,possible_probes_all_targets,tms,CpG_conflicts,SNP_conflicts,hairpin_scores,probe_arm_list,arm_upstream_loc_list,arm_downstream_loc_list,probe_id_list,arm_upstream_list,arm_downstream_list,possible_arm_combinations_all_targets = import_probe_parameters(targets,probes,tms_file,cpgs,snps,hairpins,probe_arms_file)
+    
+    probe_costs=get_probe_costs_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
+    print('\tProbe costs computed')
 
-with open(snps, 'r') as handle:
-    reader=csv.reader(handle)
-    SNP_conflicts=[]
-    for i,row in enumerate(reader):
-        snp_conflict_list=[]
-        for probe in row:
-            snp_conflict_list.append(int(probe))
-        SNP_conflicts.append(np.array(snp_conflict_list,dtype=object))
-    SNP_conflicts=np.array(SNP_conflicts,dtype=object)
+    #Iteratively exclude the most dimer forming probes.
+    chosen_probes_lists=[]
+    probes_with_dimers_lists=[]
+    conflicting_probe_list=[]
+    counter=0
+    min_dimers=len(possible_probes_all_targets)
+    while counter<permutations and min_dimers>0:
+        #Choose random probe set
+        # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
+        pool=mp.Pool(nr_of_cores)
+        chosen_probes=[]
+        chosen_probes=[pool.apply(choose_probes_from_costs,args=(probe_costs[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the cost
+        pool.close()
+        print('\tRound '+str(counter)+' :Probes chosen')
+    
+        chosen_probes_lists.append(chosen_probes)
+        probes_with_dimers,conflicting_targets,probe_costs,cpgs_of_dimer_forming_probes=increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets,chosen_probes,probe_costs,probe_cpg_id_list,probe_id_list,arm_upstream_list,arm_downstream_list,arm_upstream_loc_list,arm_downstream_loc_list,exclusion_factor,outputdir,probe_arm_list)
+        nr_of_dimer_probes=len(cpgs_of_dimer_forming_probes)
+        probes_with_dimers_lists.append(nr_of_dimer_probes)
+        conflicting_probe_list.append(probes_with_dimers)
+        print('\t'+str(nr_of_dimer_probes)+' out of '+str(len(chosen_probes))+' probes form a dimer')
+        min_dimers=min(nr_of_dimer_probes,min_dimers)
+        output_nested_list(outputdir+'costs_iter'+str(counter),probe_costs)
+        #output_nested_list(outputdir+'chosen_probes'+str(counter),chosen_probes)
+        counter+=1
+    
+    chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
+    chosen_set=chosen_probes_lists[chosen_set_index] 
 
-with open(hairpins, 'r') as handle:
-    reader=csv.reader(handle)
-    hairpin_scores=[]
-    for i,row in enumerate(reader):
-        hairpin_score_list=[]
-        for probe in row:
-            hairpin_score_list.append(int(probe))
-        hairpin_scores.append(np.array(hairpin_score_list,dtype=object))
-    hairpin_scores=np.array(hairpin_scores,dtype=object)
-with open(probe_arms_file,'rb') as handle:
-    possible_arm_combinations_all_targets=pickle.load(handle)
-    probe_arm_list=[]
-    arm_upstream_loc_list=[]
-    arm_downstream_loc_list=[]
-    probe_id_list=[]
-    arm_upstream_list=[]
-    arm_downstream_list=[]
-    for i, row in enumerate(possible_arm_combinations_all_targets):
-        probe_arm_list.append([])
-        arm_upstream_loc_list.append([])
-        arm_downstream_loc_list.append([])
-        probe_id_list.append([])
-        arm_upstream_list.append([])
-        arm_downstream_list.append([])
-        for probe in row:
-            probe_arm_list[i].append(probe)
-            arm_upstream_loc_list[i].append(probe[2])
-            arm_downstream_loc_list[i].append(probe[3])
-            probe_id_list[i].append(str(probe[7])+':'+str(probe[4]))
-            arm_upstream_list[i].append(probe[0])
-            arm_downstream_list[i].append(probe[1])
+    write_output(targets,output_name,chosen_set,conflicting_file,conflicting_probe_list,min_dimers)
+
+def get_arg_parser():
+    parser = ArgumentParser()
+    parser.add_argument("-o", "--output", dest="output_name",
+                        help="Fasta file which will contain the chosen probes as output", metavar="OUTPUTNAME")
+    parser.add_argument("-c", "--config_file", dest="config_file",
+                        help="Config file with probe specifics", metavar="JSONfile")
+    parser.add_argument("-m", "--tms", dest="tms",
+                        help="csv file containing probe binding temperatures", metavar="TMS")
+    parser.add_argument("-g", "--cpg", dest="cpg",
+                        help="csv file containing amount of cpgs in probe arms", metavar="CPG")
+    parser.add_argument("-p", "--probes", dest="probes",
+                        help="csv file containing the full probes", metavar="PROBES")
+    parser.add_argument("-a", "--hairpins", dest="hairpins",
+                        help="csv file containing hairpins of probes", metavar="HAIRPINS")
+    parser.add_argument("-n", "--snp", dest="snps",
+                        help="csv file containing amount of snps in probe arms", metavar="SNPS")
+    parser.add_argument("-r", "--targets", dest="targets",
+                        help="Bedfile containing the targets to capture", metavar="BED")
+    parser.add_argument("-b", "--arms", dest="probe_arms_file",
+                        help="csv file containing probe arms", metavar="ARMS")
+    parser.add_argument("-t", "--cores", dest="cores",
+                        help="Passed amount of cores to script", metavar="Cores")
+    parser.add_argument("-u", "--output_dir", dest="output_dir",
+                        help="Directory for output", metavar="OUTPUTDIR")
+    parser.add_argument("-f", "--conflicting_output_file", dest="conflicting_file",
+                        help="Output filename for conflicting probes per iteration", metavar="CONFLICTS")
+    return parser
+
+def import_config(config_file):
+    with open(config_file) as jsonFile:
+        configObject = json.load(jsonFile)
+        jsonFile.close()
+    permutations=int(configObject['Permutations'])
+    backbone_length=len(configObject["Backbone_sequence"][0]["Reverse_complement_universal_forward_primer"])+len(configObject["Backbone_sequence"][0]["Common_region"])+len(configObject["Backbone_sequence"][0]["Universal_reverse_primer"])
+    exclusion_factor=float(configObject["Dimer_Exclusion_Factor"])
+    seed=int(configObject['Seed'])
+    return permutations,backbone_length,exclusion_factor,seed
+
+def import_probe_parameters(targets,probes,tms_file,cpgs,snps,hairpins,probe_arms_file):
+    with open(targets,'r') as handle:
+        reader=csv.reader(handle,delimiter='\t')
+        probe_cpg_id_list=[]
+        for row in reader:
+            probe_cpg_id_list.append(row[3])
+    
+    with open(probes, 'r') as handle:
+        reader=csv.reader(handle)
+        possible_probes_all_targets=[]
+        for i,row in enumerate(reader):
+            possible_probes_all_targets.append([])
+            for probe in row:
+                possible_probes_all_targets[i].append(probe)
+
+    with open(tms_file, 'rb') as handle:
+        tms=pickle.load(handle)
+        tms=np.array(tms,dtype=object)
+
+    with open(cpgs, 'r') as handle:
+        reader=csv.reader(handle)
+        CpG_conflicts=[]
+        for i,row in enumerate(reader):
+            cpg_conflict_list=[]
+            for probe in row:
+                cpg_conflict_list.append(int(probe))
+            CpG_conflicts.append(np.array(cpg_conflict_list,dtype=object))
+        CpG_conflicts=np.array(CpG_conflicts,dtype=object)
+    
+    with open(snps, 'r') as handle:
+        reader=csv.reader(handle)
+        SNP_conflicts=[]
+        for i,row in enumerate(reader):
+            snp_conflict_list=[]
+            for probe in row:
+                snp_conflict_list.append(int(probe))
+            SNP_conflicts.append(np.array(snp_conflict_list,dtype=object))
+        SNP_conflicts=np.array(SNP_conflicts,dtype=object)
+
+    with open(hairpins, 'r') as handle:
+        reader=csv.reader(handle)
+        hairpin_scores=[]
+        for i,row in enumerate(reader):
+            hairpin_score_list=[]
+            for probe in row:
+                hairpin_score_list.append(int(probe))
+            hairpin_scores.append(np.array(hairpin_score_list,dtype=object))
+        hairpin_scores=np.array(hairpin_scores,dtype=object)
+        
+    with open(probe_arms_file,'rb') as handle:
+        possible_arm_combinations_all_targets=pickle.load(handle)
+        probe_arm_list=[]
+        arm_upstream_loc_list=[]
+        arm_downstream_loc_list=[]
+        probe_id_list=[]
+        arm_upstream_list=[]
+        arm_downstream_list=[]
+        for i, row in enumerate(possible_arm_combinations_all_targets):
+            probe_arm_list.append([])
+            arm_upstream_loc_list.append([])
+            arm_downstream_loc_list.append([])
+            probe_id_list.append([])
+            arm_upstream_list.append([])
+            arm_downstream_list.append([])
+            for probe in row:
+                probe_arm_list[i].append(probe)
+                arm_upstream_loc_list[i].append(probe[2])
+                arm_downstream_loc_list[i].append(probe[3])
+                probe_id_list[i].append(str(probe[7])+':'+str(probe[4]))
+                arm_upstream_list[i].append(probe[0])
+                arm_downstream_list[i].append(probe[1])
+    return probe_cpg_id_list,possible_probes_all_targets,tms,CpG_conflicts,SNP_conflicts,hairpin_scores,probe_arm_list,arm_upstream_loc_list,arm_downstream_loc_list,probe_id_list,arm_upstream_list,arm_downstream_list,possible_arm_combinations_all_targets
 
 def get_probe_costs_array(tms,CpG_conflicts,SNP_conflicts,hairpin_array):
     probe_cost=np.add(np.add(np.add(np.add(np.multiply(hairpin_array,int(10**10)),CpG_conflicts),SNP_conflicts),np.array(tms)),1)#Score is at least 1
     return probe_cost
 
-probe_costs=get_probe_costs_array(tms,CpG_conflicts,SNP_conflicts,hairpin_scores)
-print('\tProbe costs computed')
+def output_nested_list(filename,nested_list):
+    with open(filename,'w') as handle:
+        writer=csv.writer(handle,delimiter='\t')
+        writer.writerows(nested_list)
+    return
+
 def choose_probes_from_costs(probe_costs,possible_arm_combinations,n,counter,probe_id_list,seed):
     np.random.seed(seed)
     if probe_costs.size==0:
@@ -146,7 +201,7 @@ def choose_probes_from_costs(probe_costs,possible_arm_combinations,n,counter,pro
         index=possible_arm_combinations.index(probe[counter])
     return [probe[counter],probe_id_list[index]]
 
-def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer):
+def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer,exclusion_factor):
     probe_list=[]
     probe_list_count=[]
     for probe in conflicting_cpg_list_dimer: #only look into the first mentioned probes when forming a dimer
@@ -180,13 +235,13 @@ def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer):
         most_conflicting_dimer_range_list.append(conflict_range_dimer[index])
     return most_conflicting_dimer_range_list
 
-def get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2):
+def get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2,exclusion_factor):
     combined_conflicting_cpg_list_dimer=conflicting_cpg_list_dimer+conflicting_cpg_list_dimer2
     combined_conflict_range_dimer=conflict_range_dimer+conflict_range_dimer2
-    combined_most_conflicting_dimer_range_list=get_conflict_ranges(combined_conflicting_cpg_list_dimer,combined_conflict_range_dimer)
+    combined_most_conflicting_dimer_range_list=get_conflict_ranges(combined_conflicting_cpg_list_dimer,combined_conflict_range_dimer,exclusion_factor)
     return combined_most_conflicting_dimer_range_list
 
-def get_dimer_range_upstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer):
+def get_dimer_range_upstream(possible_arm_combinations_all_targets,arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer):
     chrom=arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
     start=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
     end=int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
@@ -201,7 +256,7 @@ def get_dimer_range_upstream(arm_loc_list,probe_index,nested_index,dimer_start_n
         print('error '+str([dimer_start_range,dimer_end_range,dimer]))
     return [dimer_range,template_strand]
 
-def get_dimer_range_downstream(arm_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S_length,dimer):
+def get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S_length,dimer):
     chrom=arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
     start=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
     end=int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
@@ -216,7 +271,7 @@ def get_dimer_range_downstream(arm_loc_list,probe_index,nested_index,dimer_start
         print('error '+str([dimer_start_range,dimer_end_range,dimer]))
     return [dimer_range,template_strand]
 
-def write_nested_loci_to_bedfile(output_name,loci_list):
+def write_nested_loci_to_bedfile(output_name,loci_list,probe_arm_list):
     to_write_list=[[locus.split(':')[0],locus.split(':')[1].split('-')[0],locus.split('-')[1],'','',probe_arm_list[i][j][-2],str(i)+':'+str(j)] for i,row in enumerate(loci_list) for j,locus in enumerate(row)] #[chrom,start,end,i:j] e.g. [1,105386,105396,0:304] for chr1:105386-105396 in the locus at loci_list[0][304]
     #to_write_list=[[locus.split(':')[0][4:],locus.split(':')[1].split('-')[0],locus.split('-')[1]] for i,row in enumerate(loci_list) for j,locus in enumerate(row)]
     with open(output_name,'w') as handle:
@@ -232,9 +287,9 @@ def write_loci_to_bedfile(output_name,loci_list):
         writer.writerows(to_write_list)
     return output_name
 
-def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up_bedfile_name,loci_down_bedfile_name,dimer_range_list,dimer_bedfile_name,bedfile_intersect_name):
-    write_nested_loci_to_bedfile(loci_up_bedfile_name,loci_list_up)
-    write_nested_loci_to_bedfile(loci_down_bedfile_name,loci_list_down)
+def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up_bedfile_name,loci_down_bedfile_name,dimer_range_list,dimer_bedfile_name,bedfile_intersect_name,probe_arm_list,outputdir):
+    write_nested_loci_to_bedfile(loci_up_bedfile_name,loci_list_up,probe_arm_list)
+    write_nested_loci_to_bedfile(loci_down_bedfile_name,loci_list_down,probe_arm_list)
     write_loci_to_bedfile(dimer_bedfile_name,dimer_range_list)
     #combine loci_down_bedfile_name and loci_up_bedfile_name
     os.system('cat '+loci_up_bedfile_name+' '+loci_down_bedfile_name+' > '+outputdir+'combined.bed')
@@ -253,7 +308,7 @@ def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up
     return new_conflicting_indices_list
 
 
-def increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_scores):#Create a fasta file with the chosen probes
+def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets,chosen_probes,probe_costs,probe_cpg_id_list,probe_id_list,arm_upstream_list,arm_downstream_list,arm_upstream_loc_list,arm_downstream_loc_list,exclusion_factor,outputdir,probe_arm_list):#Create a fasta file with the chosen probes
     passed_list=[]
     with open('tmp_fasta_chosen_probes.fasta','w') as handle:
         for i,probe in enumerate(chosen_probes):
@@ -304,39 +359,39 @@ def increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_scores):#C
                 #check whether the S1 and S2 sequences are 5' to 3' or the other way around.)
                 if arm_upstream_list[probe_index][nested_index].strip("'") in dimer['S1']['Seq'][:len(arm_upstream_list[probe_index][nested_index].strip("'"))]:
                     if dimer_start_num < len(arm_upstream_list[probe_index][nested_index].strip("'")): #dimer is in upstream arm
-                        dimer_range=get_dimer_range_upstream(arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
+                        dimer_range=get_dimer_range_upstream(possible_arm_combinations_all_targets,arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
                     elif dimer_end_num >= S1_length-len(arm_downstream_list[probe_index][nested_index].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                        dimer_range=get_dimer_range_downstream(arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
+                        dimer_range=get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
                     else: #dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
                         pass
                 else: #In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
                     dimer_start_num,dimer_end_num = S1_length-dimer_end_num , S1_length-dimer_start_num
                     if dimer_start_num < len(arm_upstream_list[probe_index][nested_index].strip("'")): #dimer is in upstream arm
-                        dimer_range=get_dimer_range_upstream(arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
+                        dimer_range=get_dimer_range_upstream(possible_arm_combinations_all_targets,arm_upstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,dimer)
                     elif dimer_end_num >= S1_length-len(arm_downstream_list[probe_index][nested_index].strip("'")): #dimer is in downstream arm If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                        dimer_range=get_dimer_range_downstream(arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
+                        dimer_range=get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstream_loc_list,probe_index,nested_index,dimer_start_num,dimer_end_num,S1_length,dimer)
                     else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
                         pass
                 if arm_upstream_list[probe_index2][nested_index2].strip("'") in dimer['S2']['Seq'][:len(arm_upstream_list[probe_index2][nested_index2].strip("'"))]:
                     if dimer_start_num2 < len(arm_upstream_list[probe_index2][nested_index2].strip("'")): #dimer is in upstream arm
-                        dimer_range2=get_dimer_range_upstream(arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
+                        dimer_range2=get_dimer_range_upstream(possible_arm_combinations_all_targets,arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
                     elif dimer_end_num2 >= S2_length-len(arm_downstream_list[probe_index2][nested_index2].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                        dimer_range2=get_dimer_range_downstream(arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
+                        dimer_range2=get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
                     else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
                         pass
                 else: #In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
                     dimer_start_num2,dimer_end_num2 = S2_length-dimer_end_num2 , S2_length-dimer_start_num2
                     if dimer_start_num2 < len(arm_upstream_list[probe_index2][nested_index2].strip("'")): #dimer is in upstream arm
-                        dimer_range2=get_dimer_range_upstream(arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
+                        dimer_range2=get_dimer_range_upstream(possible_arm_combinations_all_targets,arm_upstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,dimer)
                     elif dimer_end_num2 >= S2_length-len(arm_downstream_list[probe_index2][nested_index2].strip("'")):   #dimer is in downstream arm. If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                        dimer_range2=get_dimer_range_downstream(arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
+                        dimer_range2=get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstream_loc_list,probe_index2,nested_index2,dimer_start_num2,dimer_end_num2,S2_length,dimer)
                     else:#dimer forming region is in backbone, only report the other probe that forms the dimer together with this probe.
                         pass
                 conflict_range_dimer.append(dimer_range)
                 conflict_range_dimer2.append(dimer_range2)
 
     #Only report the probe that formed the most amount of dimers
-    most_conflicting_dimer_range_list=get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2) #obtain conflict ranges from dimer forming probes
+    most_conflicting_dimer_range_list=get_conflict_ranges_S1_and_S2(conflicting_cpg_list_dimer,conflict_range_dimer,conflicting_cpg_list_dimer2,conflict_range_dimer2,exclusion_factor) #obtain conflict ranges from dimer forming probes
     
     #find all probes that have common regions with the most_conflicting_dimer_range and report those as conflicting probes
     all_conflicting_probe_list=[]
@@ -346,7 +401,7 @@ def increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_scores):#C
     loci_down_bedfile_name=outputdir+'loci_down.bed'
     dimer_bedfile_name=outputdir+'conflicting_dimer.bed'
     bedfile_intersect_name=outputdir+'conflicting_loci.bed'
-    new_conflicting_indices_list=create_conflicting_indices_list_bedtools(arm_upstream_loc_list,arm_downstream_loc_list,loci_up_bedfile_name,loci_down_bedfile_name,most_conflicting_dimer_range_list,dimer_bedfile_name,bedfile_intersect_name)
+    new_conflicting_indices_list=create_conflicting_indices_list_bedtools(arm_upstream_loc_list,arm_downstream_loc_list,loci_up_bedfile_name,loci_down_bedfile_name,most_conflicting_dimer_range_list,dimer_bedfile_name,bedfile_intersect_name,probe_arm_list,outputdir)
     for indexes in new_conflicting_indices_list:
         i=int(indexes[0])
         j=int(indexes[1])
@@ -356,56 +411,28 @@ def increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_scores):#C
     print(str(len(conflicting_targets))+' conflicts found')
     return all_conflicting_probe_list,conflicting_targets,probe_costs,cpgs_of_dimer_forming_probes
 
-
-#-----------------------------------------------------------------------
-#Iteratively exclude the most dimer forming probes.
-chosen_probes_lists=[]
-probes_with_dimers_lists=[]
-conflicting_probe_list=[]
-counter=0
-min_dimers=len(possible_probes_all_targets)
-while counter<permutations and min_dimers>0:
-    #Choose random probe set
-    # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
-    pool=mp.Pool(nr_of_cores)
-    chosen_probes=[]
-    chosen_probes=[pool.apply(choose_probes_from_costs,args=(probe_costs[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the cost
-    pool.close()
-    print('\tRound '+str(counter)+' :Probes chosen')
+def write_output(targets,output_name,chosen_set,conflicting_file,conflicting_probe_list,min_dimers):
+    seq_list=[]
+    print('minimal number of dimers is '+str(min_dimers))
+    with open(targets,'r') as handle:
+        reader=csv.reader(handle,delimiter='\t')
+        description_list=[]
+        for row in reader:
+            description_list.append(str(row[0]+'\t'+row[-1]))
     
-    chosen_probes_lists.append(chosen_probes)
-    probes_with_dimers,conflicting_targets,probe_costs,cpgs_of_dimer_forming_probes=increase_costs_dimer_forming_probes_iterative(chosen_probes,probe_costs)
-    nr_of_dimer_probes=len(cpgs_of_dimer_forming_probes)
-    probes_with_dimers_lists.append(nr_of_dimer_probes)
-    conflicting_probe_list.append(probes_with_dimers)
-    print('\t'+str(nr_of_dimer_probes)+' out of '+str(len(chosen_probes))+' probes form a dimer')
-    min_dimers=min(nr_of_dimer_probes,min_dimers)
-    counter+=1
+    with open(output_name,'w') as handle:
+        for i,probe in enumerate(chosen_set):
+            if probe == None:
+                pass
+            else:
+                probename=str(i)
+                probe_description=description_list[i]
+                seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe[0]),id=probename,description=probe[1]))
+        SeqIO.write(seq_list,handle,'fasta')
+    with open(conflicting_file,'w') as handle:
+        writer=csv.writer(handle,delimiter='\t')
+        for row in conflicting_probe_list:
+            writer.writerow(row)
 
-chosen_set_index=probes_with_dimers_lists.index(min(probes_with_dimers_lists)) #Also check the sum of all probe scores?
-chosen_set=chosen_probes_lists[chosen_set_index]
-seq_list=[]
-
-#------------------------------------------------------------------------
-#write output
-
-print('minimal number of dimers is '+str(min_dimers))
-with open(targets,'r') as handle:
-    reader=csv.reader(handle,delimiter='\t')
-    description_list=[]
-    for row in reader:
-        description_list.append(str(row[0]+'\t'+row[-1]))
-
-with open(output_name,'w') as handle:
-    for i,probe in enumerate(chosen_set):
-        if probe == None:
-            pass
-        else:
-            probename=str(i)
-            probe_description=description_list[i]
-            seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe[0]),id=probename,description=probe[1]))
-    SeqIO.write(seq_list,handle,'fasta')
-with open(conflicting_file,'w') as handle:
-    writer=csv.writer(handle,delimiter='\t')
-    for row in conflicting_probe_list:
-        writer.writerow(row)
+if __name__ == '__main__':
+    main()
