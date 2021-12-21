@@ -1,11 +1,11 @@
-configfile: "config.json"
+configfile:	config['path_to_config_file']
 rule all:
 	input:
 		fasta=config['output_directory']+"/chosen_panel_iterative.fasta"
 #---------------------------------------------------------------------------------------------------
 rule copy_config_to_output_directory:
 	input:
-		"config.json"
+		 config['path_to_config_file']
 	output:
 		config['output_directory']+"/config.json"
 	shell:
@@ -18,7 +18,7 @@ rule create_bed_file_range:
 	output:
 		config['output_directory']+"/target_list_range.bed"
 	shell:
-		"python scripts/target_2_target_range_list.py -f {input.target} -o {output} -r {config[target_range]}"
+		"python {config[path_to_scripts]}target_2_target_range_list.py -f {input.target} -o {output} -r {config[target_range]}"
 
 rule extract_target_sequences:
 	input:
@@ -49,7 +49,7 @@ rule create_probes:
 		err = config['output_directory']+"/logs/create_probes_stderr.err"
 
 	shell:
-		"python scripts/create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]} 2> {log.err} 1> {log.out}"
+		"python {config[path_to_scripts]}create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -t {config[max_threads]} 2> {log.err} 1> {log.out}"
 #--------------------------------------------------------------------------------------------------
 #STEP 3
 rule choose_panel_iteratively:
@@ -72,5 +72,5 @@ rule choose_panel_iteratively:
 		err = config['output_directory']+"/logs/choose_panel_iteratively_stderr.err"
 
 	shell:
-                "python scripts/choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} 2> {log.err} 1> {log.out}"
+                "python {config[path_to_scripts]}choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} 2> {log.err} 1> {log.out}"
 
