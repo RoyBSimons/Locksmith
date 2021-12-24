@@ -39,12 +39,15 @@ def main():
     conflicting_probe_list=[]
     counter=0
     min_dimers=len(possible_probes_all_targets)
+    
+    create_arms_loci_bedfile(outputdir,arm_upstream_loc_list,arm_downstream_loc_list,probe_arm_list)
+
     while counter<permutations and min_dimers>0:
         #Choose random probe set
         # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
         pool=mp.Pool(nr_of_cores)
         chosen_probes=[]
-        chosen_probes=[pool.apply(choose_probes_from_costs,args=(probe_costs[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed)) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #function that choses probes by the probability which is based on the cost
+        chosen_probes=[choose_probes_from_costs(probe_costs[i],possible_arm_combinations,permutations,counter,probe_id_list[i],seed) for i,possible_arm_combinations in enumerate(possible_probes_all_targets)] #funct    ion that choses probes by the probability which is based on the cost
         pool.close()
         print('\tRound '+str(counter)+' :Probes chosen')
     
@@ -190,13 +193,12 @@ def choose_probes_from_costs(probe_costs,possible_arm_combinations,n,counter,pro
     if probe_costs.size==0:
         return
     else:
-        probe_costs=[float(i) for i in probe_costs]
-        probe_scores=1/np.array(probe_costs)
+        probe_scores=1/probe_costs.astype(np.float64)
         sum_score=sum(probe_scores)
         if sum_score==0: #If all scores are 0, there should still be a probability to choose one of the probes
             probability_distribution=[1/len(probe_scores) for i in probe_scores]
         else:
-            probability_distribution=probe_scores/sum_score
+            probability_distribution=np.divide(probe_scores,sum_score)
         probe= choice(possible_arm_combinations,n,p=probability_distribution)
         index=possible_arm_combinations.index(probe[counter])
     return [probe[counter],probe_id_list[index]]
@@ -271,31 +273,31 @@ def get_dimer_range_downstream(possible_arm_combinations_all_targets,arm_downstr
         print('error '+str([dimer_start_range,dimer_end_range,dimer]))
     return [dimer_range,template_strand]
 
-def write_nested_loci_to_bedfile(output_name,loci_list,probe_arm_list):
-    to_write_list=[[locus.split(':')[0],locus.split(':')[1].split('-')[0],locus.split('-')[1],'','',probe_arm_list[i][j][-2],str(i)+':'+str(j)] for i,row in enumerate(loci_list) for j,locus in enumerate(row)] #[chrom,start,end,i:j] e.g. [1,105386,105396,0:304] for chr1:105386-105396 in the locus at loci_list[0][304]
-    #to_write_list=[[locus.split(':')[0][4:],locus.split(':')[1].split('-')[0],locus.split('-')[1]] for i,row in enumerate(loci_list) for j,locus in enumerate(row)]
+def write_nested_loci_to_bedfile(output_name,loci_list_up,loci_list_down,probe_arm_list):
+    to_write_list_up=[[locus.split(':')[0],locus.split(':')[1].split('-')[0],locus.split('-')[1],'','',probe_arm_list[i][j][-2],str(i)+':'+str(j)] for i,row in enumerate(loci_list_up) for j,locus in enumerate(row)] #[chrom,start,end,i:j] e.g. [1,105386,105396,0:304] for chr1:105386-105396 in the locus at loci_list[0][304]
+    to_write_list_down=[[locus.split(':')[0],locus.split(':')[1].split('-')[0],locus.split('-')[1],'','',probe_arm_list[i][j][-2],str(i)+':'+str(j)] for i,row in enumerate(loci_list_down) for j,locus in enumerate(row)] #[chrom,start,end,    i:j] e.g. [1,105386,105396,0:304] for chr1:105386-105396 in the locus at loci_list[0][304]
     with open(output_name,'w') as handle:
         writer=csv.writer(handle,delimiter='\t')
-        writer.writerows(to_write_list)
+        writer.writerows(to_write_list_up)
+        writer.writerows(to_write_list_down)
     return output_name
 
 def write_loci_to_bedfile(output_name,loci_list):
     to_write_list=[[locus[0].split(':')[0],locus[0].split(':')[1].split('-')[0],locus[0].split('-')[1],'','',locus[1],str(i)] for i,locus in enumerate(loci_list)] #[chrom,start,end,i] e.g. [1,105386,105396,0] for chr1:105386-105396 in the locus at loci_list[0]
-    #to_write_list=[[locus.split(':')[0][4:],locus.split(':')[1].split('-')[0],locus.split('-')[1]] for i,locus in enumerate(loci_list)]
     with open(output_name,'w') as handle:
         writer=csv.writer(handle,delimiter='\t')
         writer.writerows(to_write_list)
     return output_name
 
+def create_arms_loci_bedfile(outputdir,arm_upstream_loc_list,arm_downstream_loc_list,probe_arm_list):
+    loci_bedfile_name=outputdir+'combined.bed'
+    write_nested_loci_to_bedfile(loci_bedfile_name,arm_upstream_loc_list,arm_downstream_loc_list,probe_arm_list)
+    return
+
 def create_conflicting_indices_list_bedtools(loci_list_up,loci_list_down,loci_up_bedfile_name,loci_down_bedfile_name,dimer_range_list,dimer_bedfile_name,bedfile_intersect_name,probe_arm_list,outputdir):
-    write_nested_loci_to_bedfile(loci_up_bedfile_name,loci_list_up,probe_arm_list)
-    write_nested_loci_to_bedfile(loci_down_bedfile_name,loci_list_down,probe_arm_list)
     write_loci_to_bedfile(dimer_bedfile_name,dimer_range_list)
-    #combine loci_down_bedfile_name and loci_up_bedfile_name
-    os.system('cat '+loci_up_bedfile_name+' '+loci_down_bedfile_name+' > '+outputdir+'combined.bed')
     #Do bedtools intersect here on combined_loci_bedfile_name and dimer_bedfile_name
     os.system('bedtools intersect -wa -s -a '+outputdir+'combined.bed -b '+dimer_bedfile_name+' -f 7E-9 > '+bedfile_intersect_name)
-    
     #obtain identifier from bedfile_intersect_name
     new_conflicting_indices_list=[]
     with open(bedfile_intersect_name,'r') as handle:
@@ -318,7 +320,6 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                 handle.write('>'+probe[1]+'\n')
                 handle.write(probe[0]+'\n')
     #test the chosen probes set for dimers
-    os.system('cp tmp_fasta_chosen_probes.fasta ~/opt/test.fasta')
     os.system('mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s 7 -t 10') #score cut-off is 7, temperature minimum is 10 degrees
     os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
     dimer_file='tmp_dimers_chosen_probes.json'
