@@ -1,0 +1,35 @@
+{
+    "path_to_config_file" : "/Locksmith/test_data/config_test.json",
+    "path_to_scripts" : "/Locksmith/scripts/",
+    "target_list_bedfile_path" : "/Locksmith/test_data/target_list.bed",
+    "output_directory" : "output",
+    "cpg_bed_path" : "/Locksmith/test_data/test_genome/chr*.bed",
+    "PATH_to_genome_database_directory" : "/Locksmith/test_data/test_genome/",
+    "PATH_to_reference_genome_fasta" : "/Locksmith/test_data/test_genome/hg38_first_2000000bp.fna_norm",
+    "ftp_path_snp_database" : "ftp://ftp.ncbi.nih.gov/snp/latest_release/VCF/GCF_000001405.39.gz",
+    "target_range" : "100",
+    "SNP_frequency_threshold" : "0.01",
+    "Dimer_Exclusion_Factor" : "1",
+    "Seed" : "11",
+    "Backbone_sequence" : [
+	    {
+		    "Reverse_complement_universal_forward_primer": "CTTAGGCTGGATCTTCTCCC",
+		    "Common_region": "GCGAATTTTA",
+		    "Universal_reverse_primer": "ACCCTCACCAACTAGGAGAT"
+	    }
+	],
+    "probe_specifics": [
+	    {
+		    "min_arm_length": 18,
+		    "max_arm_length": 23,
+		    "min_target_length": 45,
+		    "max_target_length": 50,
+		    "min_CG_percentage": 0,
+		    "max_CG_percentage": 100,
+		    "cpg_flanks": 0,
+		    "max_cpgs_in_arms": 2
+	    }
+	],
+    "Permutations": "100",
+    "max_threads": "30"
+}
