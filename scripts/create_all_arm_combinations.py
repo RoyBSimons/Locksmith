@@ -160,40 +160,6 @@ def create_cpg_id_list(bed_file):
     return cpg_id_list
 
 
-def create_all_possible_arms(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
-                             min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc):
-    probe_list = []
-    i = 0
-    for target_length in range(min_target_length,
-                               max_target_length + 1):  # loop over range of target lengths, including the maximum
-        for arm_length_downstream in range(min_arm_length, max_arm_length + 1):
-            start_loc_downstream = mid_loc - (target_length - cpg_flanks)
-            end_loc_downstream = mid_loc - cpg_flanks
-            for start_loc in range(start_loc_downstream, end_loc_downstream):
-                start_loc_upstream = start_loc + target_length
-                new_d_arm = record.seq[start_loc - arm_length_downstream:start_loc]
-                if GC(new_d_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
-                    break
-                else:
-                    pass
-                downstream_id = record.id.split(':')[0] + ":" + str(
-                    int(record.id.split(':')[1].split("-")[0]) + start_loc - arm_length_downstream) + "-" + str(
-                    int(record.id.split(':')[1].split("-")[0]) + start_loc - 1)
-                for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
-                    new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
-                    if GC(new_u_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
-                        break
-                    else:
-                        pass
-                    upstream_id = record.id.split(':')[0] + ":" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream) + "-" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream + arm_length_upstream - 1)
-                    probe = [new_u_arm, new_d_arm, upstream_id, downstream_id, i, target_length]
-                    i += 1
-                    probe_list.append(probe)
-    return probe_list
-
-
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
                                           min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id):
     # Obtain the list of possible arm combinations for one record (target CpG in the Fasta file).
@@ -271,6 +237,7 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
 
 
 def get_delta_tm_array(probe_arms_array):
+    # Calculate the delta Tm between the arms of each probe.
     A = [[string[0].count('A') for string in row] for row in probe_arms_array]
     T = [[string[0].count('T') for string in row] for row in probe_arms_array]
     G = [[string[0].count('G') for string in row] for row in probe_arms_array]
@@ -291,6 +258,7 @@ def get_delta_tm_array(probe_arms_array):
 
 
 def report_cpgs_in_arms(probe_arms_array):
+    # Count the amount of CpGs in the arms of each probe.
     upstream_count = [[string[0].count('CG') for string in row] for row in probe_arms_array]
     downstream_count = [[string[1].count('CG') for string in row] for row in probe_arms_array]
     counts_array = [np.add(upstream_count[i], downstream_count[i]) for i in range(len(upstream_count))]
@@ -298,11 +266,13 @@ def report_cpgs_in_arms(probe_arms_array):
 
 
 def add_backbone_array(probe_arms_array, backbone_sequence):
+    # Construct probe sequence (5'-3') from arms and backbone
     probe_array = [[string[0] + backbone_sequence + string[1] for string in row] for row in probe_arms_array]
     return probe_array
 
 
 def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff):
+    # Report score of hairpin when a probe forms one; else report a zero.
     seq_list = []
     list_len = len(probes)
     if list_len == 0:  # in case there is no probes
@@ -333,6 +303,7 @@ def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, s
 
 
 def obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file):
+    # This conversion is needed for couting the frequent SNPs in the probe arms.
     chrom_nr_list = []
     acc_nr_list = []
     with open(acc_nr_to_chrom_nr_file, 'r') as handle:
@@ -345,17 +316,17 @@ def obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file):
 
 
 def locus_with_accession_nr_bed_info_with_chromosome_nr(locus, chrom_nr_list, acc_nr_list):  
-    # https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_assembly_report.txt
+    # Tab seperated file with header.
+    # #Chromosome	Accession.version
     chrom = locus.split(':')[0][3:]
     left_index = locus.split(':')[1].split('-')[0]
     right_index = locus.split('-')[1]
-    # chrom_nr_list = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18','19', '20', '21', '22', 'X', 'Y']
-    # acc_nr_list = ['NC_000001.10', 'NC_000002.11', 'NC_000003.11', 'NC_000004.11', 'NC_000005.9', 'NC_000006.11','NC_000007.13', 'NC_000008.10', 'NC_000009.11', 'NC_000010.10', 'NC_000011.9', 'NC_000012.11','NC_000013.10', 'NC_000014.8', 'NC_000015.9', 'NC_000016.9', 'NC_000017.10', 'NC_000018.9','NC_000019.9', 'NC_000020.10', 'NC_000021.8', 'NC_000022.10', 'NC_000023.10', 'NC_000024.9']
     bed_info = [acc_nr_list[chrom_nr_list.index(chrom)], left_index, right_index]
     return bed_info
 
 
 def rewrite_bed_file_from_accession_nr_to_chromosome_nr(bed_path, acc_nr_to_chrom_nr_file):
+    # This conversion is needed for couting the frequent SNPs in the probe arms.
     chrom_nr_list, acc_nr_list = obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file)
     bed_info_list = []
     with open(bed_path) as handle:
@@ -392,6 +363,8 @@ def obtain_snps(probe_list, bed_path, freq_threshold, ftp_path_snp_database, acc
                         chr_list.append(chrom)
                         loc_list.append([locus])
     os.system('rm tmp_output_snp')
+
+    #Find SNPs in probe arms, and return found amount
     chrom_nr_list, acc_nr_list = obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file)
     snp_count=[]
     for i, probe_arms in enumerate(probe_list):
