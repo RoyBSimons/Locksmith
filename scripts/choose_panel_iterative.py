@@ -64,7 +64,8 @@ def main():
                                                           chosen_probes, probe_costs, probe_cpg_id_list, 
                                                           probe_id_list, arm_upstream_list, arm_downstream_list, 
                                                           arm_upstream_loc_list, arm_downstream_loc_list, 
-                                                          exclusion_factor, outputdir)
+                                                          exclusion_factor, outputdir, score_cutoff, tm_cutoff)
+
         nr_of_dimer_probes = len(cpgs_of_dimer_forming_probes)
         probes_with_dimers_lists.append(nr_of_dimer_probes)
         conflicting_probe_list.append(probes_with_dimers)
@@ -120,7 +121,9 @@ def import_config(config_file):
         config_object["backbone_sequence"][0]["universal_reverse_primer"])
     exclusion_factor = float(config_object["dimer_exclusion_factor"])
     seed = int(config_object['seed'])
-    return permutations, backbone_length, exclusion_factor, seed
+    score_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['score_cutoff'])
+    tm_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['tm_cutoff'])
+    return permutations, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff
 
 
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
@@ -360,8 +363,8 @@ def create_conflicting_indices_list_bedtools(dimer_range_list, dimer_bedfile_nam
 def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets, chosen_probes, probe_costs,
                                                   probe_cpg_id_list, probe_id_list, arm_upstream_list,
                                                   arm_downstream_list, arm_upstream_loc_list, arm_downstream_loc_list,
-                                                  exclusion_factor, outputdir):  
-    # Create a fasta file with the chosen probes
+                                                  exclusion_factor, outputdir, score_cutoff, tm_cutoff):
+    # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
     with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
         for i, probe in enumerate(chosen_probes):
@@ -372,8 +375,10 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                 handle.write(probe[0] + '\n')
     # test the chosen probes set for dimers
     os.system(
-        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s 7 -t 10')  
-    # score cut-off is 7, temperature minimum is 10 degrees
+        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
+    # Score cut-off and temperature cut-off are set in configuration file
+
+    # Obtain dimer list from mfeprimer output
     os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
     dimer_file = 'tmp_dimers_chosen_probes.json'
     with open(dimer_file) as jsonFile:

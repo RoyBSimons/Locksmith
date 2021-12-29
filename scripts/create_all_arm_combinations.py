@@ -23,8 +23,8 @@ def main():
     acc_nr_to_chrom_nr_file = args["acc_nr_to_chrom_nr_file"]
 
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
-        target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold \
-        = import_config(config_file)  # Import parameters set in configuration file
+        target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
+        score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters set in configuration file
 
     start = time.time()
     cpg_id_list = create_cpg_id_list(bed_file)  # Obtain CpG list from target bed_file
@@ -71,7 +71,7 @@ def main():
     output_name_json = 'temp_test_json'
     with mp.Pool(nr_of_cores) as pool_handle:
         hairpin_scores = [pool_handle.apply(check_probe_for_hairpin_score, 
-                                            args=(possible_probes, fasta_name, output_name_json, index)) 
+                                            args=(possible_probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff))
                           for index, possible_probes in enumerate(possible_probes_all_targets)]  
         # Obtain a 2D array containing the hairpin information of all created padlock probes. 
         # Each row consist of an array of integers; a 0 when no hairpin is formed, a 1 when a hairpin is formed.
@@ -142,9 +142,13 @@ def import_config(config_file):  # import config file
     mid_loc = int(target_range) + 1  
     # The middle nucleotide is the target range +1: the total target is created by adding the target range on both ends.
     freq_threshold = float(config_object['snp_frequency_threshold'])
+
+    score_cutoff = int(config_object['mfeprimer_hairpin_parameters'][0]['score_cutoff'])
+    tm_cutoff = int(config_object['mfeprimer_hairpin_parameters'][0]['tm_cutoff'])
+
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold
+        freq_threshold, score_cutoff, tm_cutoff
 
 
 def create_cpg_id_list(bed_file):
@@ -287,7 +291,7 @@ def add_backbone_array(probe_arms_array, backbone_sequence):
     return probe_array
 
 
-def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index):
+def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff):
     seq_list = []
     list_len = len(probes)
     if list_len == 0:  # in case there is no probes
@@ -298,7 +302,8 @@ def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index):
             seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe), id=probe_name))
         SeqIO.write(seq_list, output_handle, 'fasta')
     os.system('mfeprimer hairpin --in ' + fasta_name + str(index) + '.fa -j -o ' + output_name_json + str(
-        index) + ' -s 7 -t 10')  # Remove/move the output files; score cut-off is 7, tm threshold is 10 C
+        index) + ' -s '+str(score_cutoff)+' -t '+str(tm_cutoff))  # Remove/move the output files;
+    # Report hairpins which go over the set thresholds for score and Tm
     with open(output_name_json + str(index) + '.json') as jsonFile:
         hairpin_list = json.load(jsonFile)
         jsonFile.close()

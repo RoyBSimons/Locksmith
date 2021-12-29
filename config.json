@@ -31,6 +31,18 @@
 		    "max_cpgs_in_arms": 2
 	    }
 	],
+    "mfeprimer_hairpin_parameters": [
+            {
+                   "score_cutoff": 7,
+                   "tm_cutoff": 10
+            }
+        ],
+    "mfeprimer_dimer_parameters": [
+	    {
+		   "score_cutoff": 7,
+		   "tm_cutoff": 10
+	    }
+	],
     "permutations": "1000",
     "max_threads": "30"
 }
