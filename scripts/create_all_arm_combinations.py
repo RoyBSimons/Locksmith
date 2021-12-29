@@ -196,6 +196,17 @@ def create_all_possible_arms(record, min_target_length, max_target_length, min_a
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
                                           min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id):
+    # Obtain the list of possible arm combinations for one record (target CpG in the Fasta file).
+    # Each nested value is a list containing the following information:
+        # 0 [Sequence Upstream arm
+        # 1 Sequence Downstream arm
+        # 2 genomic location upstream arm
+        # 3 genomic location downstream arm
+        # 4 nr of probe for this target CpG
+        # 5 target length
+        # 6 standedness
+        # 7 CpG Id]
+
     probe_list = []
     i = 0
     rev_record = record.reverse_complement()

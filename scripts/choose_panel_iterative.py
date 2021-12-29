@@ -27,14 +27,14 @@ def main():
     outputdir = args["output_dir"] + '/'
     conflicting_file = args["conflicting_file"]
 
-    permutations, backbone_length, exclusion_factor, seed = import_config(config_file)
+    permutations, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
         possible_arm_combinations_all_targets = import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins,
-                                                                        probe_arms_file)
+                                                                        probe_arms_file)  # Import output create probe rule.
 
-    probe_costs = get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_scores)
+    probe_costs = get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_scores)  # Obtain probe costs from delta Tm, hairpin formation, CpG and SNP conflicts.
     print('\tProbe costs computed')
 
     # Iteratively exclude the most dimer forming probes.
@@ -44,21 +44,25 @@ def main():
     counter = 0
     min_dimers = len(possible_probes_all_targets)
 
-    create_arms_loci_bedfile(outputdir, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
+    # Create a bedfile for all possible upstream and downstream arms.
+    # This file is used for the create_conflicting_indices_list_bedtools function inside the increase_costs_dimer_forming_probes_iterative function.
+    loci_bedfile_name = outputdir + 'combined.bed'
+    write_nested_loci_to_bedfile(loci_bedfile_name, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
 
+    #Loop to choose probes and rescore dimer-forming probes untill the maximum amount of iterations is encountered or there are no dimer-forming probes in the panel.
     while counter < permutations and min_dimers > 0:
-        # Choose random probe set
-        # put the below lines in a function that can be called ~100 times to be able to find the best subset of probes.
-        pool = mp.Pool(nr_of_cores)
-        chosen_probes = [
-            choose_probes_from_costs(probe_costs[i], possible_arm_combinations, permutations, counter, probe_id_list[i],
-                                     seed) for i, possible_arm_combinations in enumerate(
-                possible_probes_all_targets)]  
-        # function that choses probes by the probability which is based on the cost
-        pool.close()
+        # Choose probe set based on probability which is set by cost of a probe.
+        chosen_probes = [choose_probes_from_costs(probe_costs[i], possible_arm_combinations,
+                                                    permutations, counter, probe_id_list[i],
+                                                    seed)
+                        for i, possible_arm_combinations in enumerate(possible_probes_all_targets)]
+
         print('\tRound ' + str(counter) + ' :Probes chosen')
 
-        chosen_probes_lists.append(chosen_probes)
+        chosen_probes_lists.append(chosen_probes) #Keep panel of probes for later.
+
+        # Increase cost of probes that are chosen as conflicting probes.
+        # The dimer exlcusion factor determines the percentage of dimer-forming probes that are reported as conflicting.
         probes_with_dimers, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes = \
             increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets, 
                                                           chosen_probes, probe_costs, probe_cpg_id_list, 
@@ -70,16 +74,13 @@ def main():
         probes_with_dimers_lists.append(nr_of_dimer_probes)
         conflicting_probe_list.append(probes_with_dimers)
         print('\t' + str(nr_of_dimer_probes) + ' out of ' + str(len(chosen_probes)) + ' probes form a dimer')
-        min_dimers = min(nr_of_dimer_probes, min_dimers)
-        output_nested_list(outputdir + 'costs_iter' + str(counter), probe_costs)
-        # output_nested_list(outputdir+'chosen_probes'+str(counter),chosen_probes)
+        min_dimers = min(nr_of_dimer_probes, min_dimers)  # Store the minimum number of dimers, to choose this panel after all iterations.
         counter += 1
 
-    chosen_set_index = probes_with_dimers_lists.index(
-        min(probes_with_dimers_lists))  # Also check the sum of all probe scores?
-    chosen_set = chosen_probes_lists[chosen_set_index]
+    chosen_set_index = probes_with_dimers_lists.index(min(probes_with_dimers_lists))  # Find index of panel with the least amount of dimers.
+    chosen_set = chosen_probes_lists[chosen_set_index]  # Get panel with the least amount of dimers.
 
-    write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers)
+    write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers)  # Write the output to a file.
 
 
 def get_arg_parser():
@@ -112,6 +113,7 @@ def get_arg_parser():
 
 
 def import_config(config_file):
+    # Import parameters set in configuration file
     with open(config_file) as jsonFile:
         config_object = json.load(jsonFile)
         jsonFile.close()
@@ -127,12 +129,18 @@ def import_config(config_file):
 
 
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
+    # Import the probe parameters from each of the separate files created by the Create_probes rule
+    # All 2D array are a object dtype as the amount of probes per CpG differ.
+
+    # Get CpG id from bedfile containing all targets
     with open(targets, 'r') as handle:
         reader = csv.reader(handle, delimiter='\t')
         probe_cpg_id_list = []
         for row in reader:
             probe_cpg_id_list.append(row[3])
 
+    # 2D array containing the padlock probes. Each row consist of an array of strings containing the full
+    # padlock probe sequences.
     with open(probes, 'r') as handle:
         reader = csv.reader(handle)
         possible_probes_all_targets = []
@@ -141,10 +149,14 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
             for probe in row:
                 possible_probes_all_targets[i].append(probe)
 
+    # Obtain 2D array containing the difference in Tm between the upstream and downstream arm of the padlock probe.
+    # Each row consist of the delta-tms for all possible padlock probes to target one CpG.
     with open(tms_file, 'rb') as handle:
         tms = pickle.load(handle)
         tms = np.array(tms, dtype=object)
 
+    # Obtain a 2D array containing the amount of CpGs in the arms of the padlock probe.
+    # Each row consist of the amount of CpGs in the arms for all possible padlock probes to target one CpG.
     with open(cpgs, 'r') as handle:
         reader = csv.reader(handle)
         cpg_conflicts = []
@@ -155,6 +167,8 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
             cpg_conflicts.append(np.array(cpg_conflict_list, dtype=object))
         cpg_conflicts = np.array(cpg_conflicts, dtype=object)
 
+    # Obtain a 2D array containing the amount of frequent SNPs in the arms of the padlock probe.
+    # Each row consist of the amount of SNPs in the arms for all possible padlock probes to target one CpG.
     with open(snps, 'r') as handle:
         reader = csv.reader(handle)
         snp_conflicts = []
@@ -165,6 +179,8 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
             snp_conflicts.append(np.array(snp_conflict_list, dtype=object))
         snp_conflicts = np.array(snp_conflicts, dtype=object)
 
+    # Obtain a 2D array containing the hairpin information of all created padlock probes.
+    # Each row consist of an array of integers; a 0 when no hairpin is formed, a 1 when a hairpin is formed.
     with open(hairpins, 'r') as handle:
         reader = csv.reader(handle)
         hairpin_scores = []
@@ -175,6 +191,16 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
             hairpin_scores.append(np.array(hairpin_score_list, dtype=object))
         hairpin_scores = np.array(hairpin_scores, dtype=object)
 
+    # Obtain the 2D array of possible arm combinations for each target CpG in the Fasta file.
+    # Each probe is a list containing the following information:
+        # 0 [Sequence Upstream arm
+        # 1 Sequence Downstream arm
+        # 2 genomic location upstream arm
+        # 3 genomic location downstream arm
+        # 4 nr of probe for this target CpG
+        # 5 target length
+        # 6 standedness
+        # 7 CpG Id]
     with open(probe_arms_file, 'rb') as handle:
         possible_arm_combinations_all_targets = pickle.load(handle)
         probe_arm_list = []
@@ -191,57 +217,58 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
             arm_upstream_list.append([])
             arm_downstream_list.append([])
             for probe in row:
-                probe_arm_list[i].append(probe)
-                arm_upstream_loc_list[i].append(probe[2])
-                arm_downstream_loc_list[i].append(probe[3])
-                probe_id_list[i].append(str(probe[7]) + ':' + str(probe[4]))
-                arm_upstream_list[i].append(probe[0])
-                arm_downstream_list[i].append(probe[1])
+                probe_arm_list[i].append(probe)                                 # All info
+                arm_upstream_loc_list[i].append(probe[2])                       # Genomic location of upstream arm sequence.
+                arm_downstream_loc_list[i].append(probe[3])                     # Genomic location of downstream arm sequence.
+                probe_id_list[i].append(str(probe[7]) + ':' + str(probe[4]))    # CpG identifier + number of created probe
+                arm_upstream_list[i].append(probe[0])                           # Upstream arm sequence
+                arm_downstream_list[i].append(probe[1])                         # Downstream arm sequence
+
     return probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, \
         probe_arm_list, arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, \
         arm_downstream_list, possible_arm_combinations_all_targets
 
 
 def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array):
+    # Calculate probe cost from delta tm, hairpin formation and CpG and SNP conflicts.
+    # Cost = (hairpin * 10^10)+ CpG conflicts + SNP conflicts + delta_tm
     probe_cost = np.add(np.add(np.add(np.add(np.multiply(hairpin_array, int(10**10)), cpg_conflicts), snp_conflicts), tms),1)
     # Score is at least 1
     return probe_cost
 
 
-def output_nested_list(filename, nested_list):
-    with open(filename, 'w') as handle:
-        writer = csv.writer(handle, delimiter='\t')
-        writer.writerows(nested_list)
-    return
-
-
 def choose_probes_from_costs(probe_costs, possible_arm_combinations, n, counter, probe_id_list, seed):
-    np.random.seed(seed)
+    # Choose probes based on the current cost.
+    # Cost changes each iteration
+    np.random.seed(seed)  # Set seed from configuration file
     if probe_costs.size == 0:
         return
     else:
         probe_scores = 1 / probe_costs.astype(np.float64)
         sum_score = sum(probe_scores)
         if sum_score == 0:  # If all scores are 0, there should still be a probability to choose one of the probes
-            probability_distribution = [1 / len(probe_scores)] * len(probe_scores)
+            probability_distribution = [1 / len(probe_scores)] * len(probe_scores)  # Create list of probabilities to choose probe
         else:
             probability_distribution = np.divide(probe_scores, sum_score)
-        probe = choice(possible_arm_combinations, n, p=probability_distribution)
+        probe = choice(possible_arm_combinations, n, p=probability_distribution)  # Choose probe based on probability list
         index = possible_arm_combinations.index(probe[counter])
     return [probe[counter], probe_id_list[index]]
 
 
-def get_conflict_ranges(conflicting_cpg_list_dimer, conflict_range_dimer, exclusion_factor):
+def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer, exclusion_factor):
     probe_list = []
     probe_list_count = []
-    for probe in conflicting_cpg_list_dimer:  # only look into the first mentioned probes when forming a dimer
+
+    # Count how often a probe forms a dimer in the panel.
+    for probe in conflicting_cpg_list_dimer:
         if probe in probe_list:
             probe_list_count[probe_list.index(probe)] += 1
         else:
             probe_list.append(probe)
             probe_list_count.append(1)
-    if probe_list_count == []:
+    if probe_list_count == []: #If there are no conflicts add a 0.
         probe_list_count = [0]
+
     nr_of_times = max(probe_list_count)
     sorted_nr_list = []
     sorted_probe_list = []
@@ -269,8 +296,11 @@ def get_conflict_ranges(conflicting_cpg_list_dimer, conflict_range_dimer, exclus
 
 def get_conflict_ranges_s1_and_s2(conflicting_cpg_list_dimer, conflict_range_dimer, conflicting_cpg_list_dimer2,
                                   conflict_range_dimer2, exclusion_factor):
+    # Combine conflict ranges from the S1 and S2 probes from mfeprimer dimer
     combined_conflicting_cpg_list_dimer = conflicting_cpg_list_dimer + conflicting_cpg_list_dimer2
     combined_conflict_range_dimer = conflict_range_dimer + conflict_range_dimer2
+
+    # Keep top percentage of combined conflict dimers, based on exclusion factor.
     combined_most_conflicting_dimer_range_list = get_conflict_ranges(combined_conflicting_cpg_list_dimer,
                                                                      combined_conflict_range_dimer, exclusion_factor)
     return combined_most_conflicting_dimer_range_list
@@ -278,6 +308,8 @@ def get_conflict_ranges_s1_and_s2(conflicting_cpg_list_dimer, conflict_range_dim
 
 def get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list, probe_index, nested_index,
                              dimer_start_num, dimer_end_num, dimer):
+    # Obtain dimer range and template strand from the dimer forming region in the upstream arm of one precific probe
+    # This translates a conflicting probe into a conflicting region to form a probe arm from
     chrom = arm_upstream_loc_list[probe_index][nested_index].split(':')[0]
     start = int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
     end = int(arm_upstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
@@ -295,6 +327,8 @@ def get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream
 
 def get_dimer_range_downstream(possible_arm_combinations_all_targets, arm_downstream_loc_list, probe_index,
                                nested_index, dimer_start_num, dimer_end_num, s_length, dimer):
+    # Obtain dimer range and template strand from the dimer forming region in the downstream arm of one precific probe
+    # This translates a conflicting probe into a conflicting region to form a probe arm from
     chrom = arm_downstream_loc_list[probe_index][nested_index].split(':')[0]
     start = int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[0].strip("'"))
     end = int(arm_downstream_loc_list[probe_index][nested_index].split(':')[1].split('-')[1].strip("'"))
@@ -337,12 +371,6 @@ def write_loci_to_bedfile(output_name, loci_list):
     return output_name
 
 
-def create_arms_loci_bedfile(outputdir, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list):
-    loci_bedfile_name = outputdir + 'combined.bed'
-    write_nested_loci_to_bedfile(loci_bedfile_name, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
-    return
-
-
 def create_conflicting_indices_list_bedtools(dimer_range_list, dimer_bedfile_name, bedfile_intersect_name, outputdir):
     write_loci_to_bedfile(dimer_bedfile_name, dimer_range_list)
     # Do bedtools intersect here on combined_loci_bedfile_name and dimer_bedfile_name
@@ -373,7 +401,8 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
             else:
                 handle.write('>' + probe[1] + '\n')
                 handle.write(probe[0] + '\n')
-    # test the chosen probes set for dimers
+
+    # Test the chosen probes set for dimers
     os.system(
         'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
     # Score cut-off and temperature cut-off are set in configuration file
@@ -389,6 +418,8 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
     conflict_range_dimer = []
     conflict_range_dimer2 = []
     cpgs_of_dimer_forming_probes = set([])
+
+    # Obtain dimer ranges from dimer list of mfeprimer dimer output.
     if dimerlist is None:
         pass
     else:
@@ -415,82 +446,95 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
             probe_index2 = probe_cpg_id_list.index(cpg_id2.split(':')[0])
             nested_index2 = probe_id_list[probe_index2].index(cpg_id2)
             # obtain the genomic locations of the dimer forming regions for S1
-            # check whether the S1 and S2 sequences are 5' to 3' or the other way around.)
+            # check whether the S1 sequence is 5' to 3' or the other way around.
             if arm_upstream_list[probe_index][nested_index].strip("'") in dimer['S1']['Seq'][:len(
                     arm_upstream_list[probe_index][nested_index].strip("'"))]:
+                # Check whether the dimer in in the upstream or downstream arm of the S1 probe
                 if dimer_start_num < len(
                         arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
                     dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
                                                            probe_index, nested_index, dimer_start_num, dimer_end_num,
                                                            dimer)
+                    conflict_range_dimer.append(dimer_range)
                 elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
                     dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
                                                              arm_downstream_loc_list, probe_index, nested_index,
                                                              dimer_start_num, dimer_end_num, s1_length, dimer)
+                    conflict_range_dimer.append(dimer_range)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
             else:  # In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
                 dimer_start_num, dimer_end_num = s1_length - dimer_end_num, s1_length - dimer_start_num
+                # Check whether the dimer in in the upstream or downstream arm of the S1 probe
                 if dimer_start_num < len(
                         arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
                     dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
                                                            probe_index, nested_index, dimer_start_num, dimer_end_num,
                                                            dimer)
+                    conflict_range_dimer.append(dimer_range)
                 elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
                         "'")):  # dimer is in downstream arm
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
                     dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
                                                              arm_downstream_loc_list, probe_index, nested_index,
                                                              dimer_start_num, dimer_end_num, s1_length, dimer)
+                    conflict_range_dimer.append(dimer_range)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
+
+            # obtain the genomic locations of the dimer forming regions for S2
+            # check whether the S2 sequence is 5' to 3' or the other way around.
             if arm_upstream_list[probe_index2][nested_index2].strip("'") in dimer['S2']['Seq'][:len(
                     arm_upstream_list[probe_index2][nested_index2].strip("'"))]:
+                # Check whether the dimer in in the upstream or downstream arm of the S2 probe
                 if dimer_start_num2 < len(
                         arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
                     dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
                                                             arm_upstream_loc_list, probe_index2, nested_index2,
                                                             dimer_start_num2, dimer_end_num2, dimer)
+                    conflict_range_dimer2.append(dimer_range2)
                 elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
                     dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
                                                               arm_downstream_loc_list, probe_index2, nested_index2,
                                                               dimer_start_num2, dimer_end_num2, s2_length, dimer)
+                    conflict_range_dimer2.append(dimer_range2)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
             else:  # In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
                 dimer_start_num2, dimer_end_num2 = s2_length - dimer_end_num2, s2_length - dimer_start_num2
+                # Check whether the dimer in in the upstream or downstream arm of the S2 probe
                 if dimer_start_num2 < len(
                         arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
                     dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
                                                             arm_upstream_loc_list, probe_index2, nested_index2,
                                                             dimer_start_num2, dimer_end_num2, dimer)
+                    conflict_range_dimer2.append(dimer_range2)
                 elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
                     dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
                                                               arm_downstream_loc_list, probe_index2, nested_index2,
                                                               dimer_start_num2, dimer_end_num2, s2_length, dimer)
+                    conflict_range_dimer2.append(dimer_range2)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
-            conflict_range_dimer.append(dimer_range)
-            conflict_range_dimer2.append(dimer_range2)
 
-    # Only report the probe that formed the most amount of dimers
+    # Only report the probes that formed the most amount of dimers.
+    # Exclusion factor determines the amount of conflicting probes that is selected. 1 = all, 0.1 = top 10%, etc.
     most_conflicting_dimer_range_list = get_conflict_ranges_s1_and_s2(conflicting_cpg_list_dimer, conflict_range_dimer,
                                                                       conflicting_cpg_list_dimer2,
                                                                       conflict_range_dimer2,
                                                                       exclusion_factor)
-    # obtain conflict ranges from dimer forming probes
 
-    # find all probes that have common regions with the most_conflicting_dimer_range and report as conflicting probes
+    # Find all probes that have common regions with the most_conflicting_dimer_range and report as conflicting probes
     all_conflicting_probe_list = []
     conflicting_targets = set([])
     print('Dimer ranges obtained')
@@ -499,19 +543,26 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
     new_conflicting_indices_list = create_conflicting_indices_list_bedtools(most_conflicting_dimer_range_list,
                                                                             dimer_bedfile_name, bedfile_intersect_name,
                                                                             outputdir)
+    # Increase the cost of probes are conflicting and are more likely to form dimers.
     for indexes in new_conflicting_indices_list:
         i = int(indexes[0])
         j = int(indexes[1])
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
-        probe_costs[i][j] = probe_costs[i][j] + float(10 ** 10)  # Adjust cost of conflicting probe
+        probe_costs[i][j] = probe_costs[i][j] + float(10 ** 10)  # Increase cost of conflicting probe
     print(str(len(conflicting_targets)) + ' conflicts found')
     return all_conflicting_probe_list, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes
 
 
 def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers):
-    seq_list = []
+    # Write the output of the Choose_probes rule.
+        # 1. Fasta file with chosen panel
+        # 2. Tab delimiter file with conflicting probes per iteration
+
     print('minimal number of dimers is ' + str(min_dimers))
+
+    # Create discriptions for chosen probes, based on the targets.
+    seq_list = []
     with open(targets, 'r') as handle:
         reader = csv.reader(handle, delimiter='\t')
         description_list = []
@@ -519,6 +570,8 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
             loc=int((int(row[1])+int(row[2])-1)/2)  #Obtain middle value from target bed file. Middle value is the location of the CpG.
             description_list.append(str(row[0] + ':' + str(loc)  + '\t' + row[-1]))
 
+    # Choose panel with the least amount of dimers.
+    # Write probes of chosen panel to a fasta file.
     with open(output_name, 'w') as handle:
         for i, probe in enumerate(chosen_set):
             if probe is None:
@@ -529,6 +582,8 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                 seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe[0]), id=probename, description=probe_description))
                 # probe[1]))
         SeqIO.write(seq_list, handle, 'fasta')
+
+    # Return conflicting probes per iteration to a file.
     with open(conflicting_file, 'w') as handle:
         writer = csv.writer(handle, delimiter='\t')
         for row in conflicting_probe_list:
