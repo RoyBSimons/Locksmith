@@ -247,7 +247,7 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
 def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array):
     # Calculate probe cost from delta tm, hairpin formation and CpG and SNP conflicts.
     # Cost = (hairpin * 10^10)+ CpG conflicts + SNP conflicts + delta_tm
-    probe_cost = np.add(np.add(np.add(np.add(np.multiply(hairpin_array, int(10**10)), cpg_conflicts), snp_conflicts), tms),1)
+    probe_cost = np.add(np.add(np.add(np.add(np.multiply(hairpin_array, int(10**10)),np.multiply(cpg_conflicts,int(10**5))),np.multiply(snp_conflicts,int(10**5))), np.multiply(tms,int(10**4))),1)
     # Score is at least 1
     return probe_cost
 
