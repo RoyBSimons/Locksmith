@@ -43,7 +43,7 @@ def main():
     print('All possible arms obtained')  # print progress to log file
 
     start = time.time()
-    tms = get_delta_tm_array(possible_arm_combinations_all_targets)  
+    tms, tms_up, tms_down = get_delta_tm_array(possible_arm_combinations_all_targets)  
     # Obtain a 2D array containing the difference in Tm between the upstream and downstream arm of the padlock probe. 
     # Each row consist of the delta-tms for all possible padlock probes to target one CpG.
     end = time.time()
@@ -91,7 +91,7 @@ def main():
 
     start = time.time()
     create_output_files(output_dir, tms, cpg_conflicts, possible_probes_all_targets, hairpin_scores, snp_conflicts,
-                        possible_arm_combinations_all_targets)  
+                        possible_arm_combinations_all_targets, tms_up, tms_down)  
     # Write all created padlock probes and their parameters to files.
     end = time.time()
     print(round(end - start, 2))  # print elapsed time to log file
@@ -242,19 +242,19 @@ def get_delta_tm_array(probe_arms_array):
     T = [[string[0].count('T') for string in row] for row in probe_arms_array]
     G = [[string[0].count('G') for string in row] for row in probe_arms_array]
     C = [[string[0].count('C') for string in row] for row in probe_arms_array]
-    tm_up = [np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
-                                    np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))) for i in
-             range(len(A))]  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
+    tm_up = np.array([np.array(np.round(np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
+                                    np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))),1)) for i in
+             range(len(A))])  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
     A = [[string[1].count('A') for string in row] for row in probe_arms_array]
     T = [[string[1].count('T') for string in row] for row in probe_arms_array]
     G = [[string[1].count('G') for string in row] for row in probe_arms_array]
     C = [[string[1].count('C') for string in row] for row in probe_arms_array]
-    tm_down = [np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
-                                      np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))) for i in
-               range(len(A))]  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
-    tms = [[np.round(np.absolute(np.subtract(tm_down[i][j], tm_up[i][j])), 1) for j in range(len(A[i]))] for i in
-           range(len(A))]
-    return tms
+    tm_down = np.array([np.array(np.round(np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
+                                      np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))),1)) for i in
+               range(len(A))])  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
+    tms = np.array([np.array([np.round(np.absolute(np.subtract(tm_down[i][j], tm_up[i][j])), 1) for j in range(len(A[i]))]) for i in
+           range(len(A))])
+    return tms, tm_up, tm_down
 
 
 def report_cpgs_in_arms(probe_arms_array):
@@ -386,7 +386,7 @@ def obtain_snps(probe_list, bed_path, freq_threshold, ftp_path_snp_database, acc
 
 # Store all information from the possible probes into files
 def create_output_files(output_dir, tms, cpg_conflicts, possible_probes_all_targets, hairpin_scores, snp_conflicts,
-                        possible_arm_combinations_all_targets):
+                        possible_arm_combinations_all_targets, tms_up, tms_down):
     start = time.time()
     with open(output_dir + 'tms.csv', 'wb') as file:
         pickle.dump(tms, file)
@@ -408,6 +408,10 @@ def create_output_files(output_dir, tms, cpg_conflicts, possible_probes_all_targ
             file.write("\n")
     with open(output_dir + 'probe_arms.csv', 'wb') as file:
         pickle.dump(possible_arm_combinations_all_targets, file)
+    with open(output_dir + 'tms_down.csv', 'wb') as file:
+        pickle.dump(tms_up, file)
+    with open(output_dir + 'tms_up.csv', 'wb') as file:
+        pickle.dump(tms_down, file)
     end = time.time()
     print(end - start)
     return

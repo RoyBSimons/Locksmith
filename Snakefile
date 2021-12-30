@@ -66,12 +66,12 @@ rule choose_panel_iteratively:
 
 	output:
                 fasta=config['output_directory']+"/chosen_panel_iterative.fasta",
-		conflicts=config['output_directory']+"/conflicting_probes_per_iteration.csv"
+		conflicts=config['output_directory']+"/conflicting_probes_per_iteration.csv",
+		panel = config['output_directory']+"/chosen_panel.csv"
 
 	log:
 		out = config['output_directory']+"/logs/choose_panel_iteratively_stdout.log",
 		err = config['output_directory']+"/logs/choose_panel_iteratively_stderr.err"
 
 	shell:
-                "python {config[path_to_scripts]}choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} 2> {log.err} 1> {log.out}"
-
+                "python {config[path_to_scripts]}choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} -e {output.panel} 2> {log.err} 1> {log.out}"

@@ -26,13 +26,15 @@ def main():
     nr_of_cores = int(args["cores"])
     outputdir = args["output_dir"] + '/'
     conflicting_file = args["conflicting_file"]
+    panel_output_file = args['panel_output_file']
 
-    permutations, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters from configuration file.
+    permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
-        possible_arm_combinations_all_targets = import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins,
-                                                                        probe_arms_file)  # Import output create probe rule.
+        possible_arm_combinations_all_targets, tms_up, tms_down = import_probe_parameters(targets, probes, tms_file, 
+                                                                                            cpgs, snps, hairpins,
+                                                                                            probe_arms_file)  # Import output create probe rule.
 
     probe_costs = get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_scores)  # Obtain probe costs from delta Tm, hairpin formation, CpG and SNP conflicts.
     print('\tProbe costs computed')
@@ -79,8 +81,11 @@ def main():
 
     chosen_set_index = probes_with_dimers_lists.index(min(probes_with_dimers_lists))  # Find index of panel with the least amount of dimers.
     chosen_set = chosen_probes_lists[chosen_set_index]  # Get panel with the least amount of dimers.
+    dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets)
 
-    write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers)  # Write the output to a file.
+    write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
+                panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
+                hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down)  # Write the output to a file.
 
 
 def get_arg_parser():
@@ -109,6 +114,8 @@ def get_arg_parser():
                         help="Directory for output", metavar="OUTPUTDIR")
     parser.add_argument("-f", "--conflicting_output_file", dest="conflicting_file",
                         help="Output filename for conflicting probes per iteration", metavar="CONFLICTS")
+    parser.add_argument("-e", "--panel_output_file", dest="panel_output_file",
+                        help="Comma separated file with information of all probes in the panel", metavar="PANEL")
     return parser
 
 
@@ -118,14 +125,15 @@ def import_config(config_file):
         config_object = json.load(jsonFile)
         jsonFile.close()
     permutations = int(config_object['permutations'])
-    backbone_length = len(config_object["backbone_sequence"][0]["reverse_complement_universal_forward_primer"]) + len(
-        config_object["backbone_sequence"][0]["common_region"]) + len(
-        config_object["backbone_sequence"][0]["universal_reverse_primer"])
+    backbone_sequence = config_object["backbone_sequence"][0]["reverse_complement_universal_forward_primer"] \
+        + config_object["backbone_sequence"][0]["common_region"] \
+        + config_object["backbone_sequence"][0]["universal_reverse_primer"]
+    backbone_length = len(backbone_sequence)
     exclusion_factor = float(config_object["dimer_exclusion_factor"])
     seed = int(config_object['seed'])
     score_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['score_cutoff'])
     tm_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['tm_cutoff'])
-    return permutations, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff
+    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff
 
 
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
@@ -154,7 +162,14 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
     with open(tms_file, 'rb') as handle:
         tms = pickle.load(handle)
         tms = np.array(tms, dtype=object)
-
+    tms_up_file = tms_file[:-4]+'_up'+tms_file[-4:]
+    with open(tms_up_file, 'rb') as handle:
+        tms_up = pickle.load(handle)
+        tms_up = np.array(tms_up, dtype=object)
+    tms_down_file = tms_file[:-4]+'_down'+tms_file[-4:]
+    with open(tms_down_file, 'rb') as handle:
+        tms_down = pickle.load(handle)
+        tms_down = np.array(tms_down, dtype=object)
     # Obtain a 2D array containing the amount of CpGs in the arms of the padlock probe.
     # Each row consist of the amount of CpGs in the arms for all possible padlock probes to target one CpG.
     with open(cpgs, 'r') as handle:
@@ -226,7 +241,7 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
 
     return probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, \
         probe_arm_list, arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, \
-        arm_downstream_list, possible_arm_combinations_all_targets
+        arm_downstream_list, possible_arm_combinations_all_targets, tms_up, tms_down
 
 
 def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array):
@@ -554,7 +569,43 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
     return all_conflicting_probe_list, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes
 
 
-def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers):
+def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
+     # Test the chosen probes set for dimers
+    os.system(
+        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
+    # Score cut-off and temperature cut-off are set in configuration file
+
+    # Obtain dimer list from mfeprimer output
+    os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
+    dimer_file = 'tmp_dimers_chosen_probes.json'
+    with open(dimer_file) as jsonFile:
+        dimerlist = json.load(jsonFile)
+        jsonFile.close()
+
+    dimer_scores = [0]*len(chosen_set)
+    genomic_loci_list=[]
+    with open(targets,'r') as handle:
+        reader = csv.reader(handle, delimiter = '\t')
+        for row in reader:
+            genomic_loci=row[0]+':'+str((int(row[1])+int(row[2])+1)/2)
+            genomic_loci_list.append(genomic_loci)
+
+
+    # Obtain dimer scores from dimer list of mfeprimer dimer output.
+    if dimerlist is None:
+        pass
+    else:
+        for dindex, dimer in enumerate(dimerlist):
+            cpg_loc1 = dimer['S1']['Desc'].split('\t')[0]
+            cpg_loc2 = dimer['S2']['Desc'].split('\t')[0]
+            tm = round(float(dimer['Tm']),2)
+            for genomic_loci in [cpg_loc1,cpg_loc2]:
+                index = genomic_loci_list.index(genomic_loci)
+                dimer_scores[index] = max(dimer_scores[index],tm)
+    return dimer_scores
+
+
+def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers, panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down):
     # Write the output of the Choose_probes rule.
         # 1. Fasta file with chosen panel
         # 2. Tab delimiter file with conflicting probes per iteration
@@ -568,7 +619,7 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
         description_list = []
         for row in reader:
             loc=int((int(row[1])+int(row[2])-1)/2)  #Obtain middle value from target bed file. Middle value is the location of the CpG.
-            description_list.append(str(row[0] + ':' + str(loc)  + '\t' + row[-1]))
+            description_list.append(str(row[0] + ':' + str(loc)  + '\t' + row[-1]))  # Genomic locus \t nr of chosen probe for CpG
 
     # Choose panel with the least amount of dimers.
     # Write probes of chosen panel to a fasta file.
@@ -589,6 +640,37 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
         for row in conflicting_probe_list:
             writer.writerow(row)
 
+    
+    # Return tab separated file with information about probe panel
+    with open(panel_output_file, 'w') as handle:
+        writer = csv.writer(handle, delimiter = ',')
+        header = ['Genomic_locus', 'CpG_id', 'Probe_sequence', 'Upstream_arm_sequence', 'Backbone_sequence', 'Downstream_arm_sequence', 
+                    'Genomic_locus_upstream_arm', 'Genomic_locus_downstream_arm', 'Target_length', 'Target_strand', 'Delta_Tm',
+                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score']
+        writer.writerow(header)
+        for i,probe in enumerate(chosen_set):
+            probe_id=int(probe[1].split(':')[-1])
+            locus = description_list[i].split('\t')[0]  # 0 Genomic locus
+            cpg_id = description_list[i].split('\t')[1]  # 1 CpG id
+            probe_sequence = probe[0]  # 2 sequence
+            upstream_sequence = probe_arm_list[i][probe_id][0]  # 3 Upstream arm sequence
+            backbone_sequence = backbone_sequence  # 4 Backbone sequence
+            downstream_sequence = probe_arm_list[i][probe_id][1]  # 5 Downstream arm sequence
+            upstream_locus =  probe_arm_list[i][probe_id][2]  # 6 Genomic location upstream arm
+            downstream_locus = probe_arm_list[i][probe_id][3]  # 7 Genomic location downstream arm
+            target_length = probe_arm_list[i][probe_id][5]  # 8 Target length
+            strandedness = probe_arm_list[i][probe_id][6]  # 9 Which strand is the target strand
+            delta_tm = tms[i][probe_id]  # 10 Difference in Tm between probe arms
+            tm_up = tms_up[i][probe_id]  # 11 Tm upstream arm
+            tm_down = tms_down[i][probe_id]  # 12 Tm downstream arm
+            cpg_conflict = cpg_conflicts[i][probe_id]  # 13 Amount of CpGs in arms
+            snp_conflict = snp_conflicts[i][probe_id]  # 14 Amount of frequent SNPs in arms
+            hairpin_score = hairpin_scores[i][probe_id]  # 15 Hairpin score of probe
+            dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
+            row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus, 
+                    downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict, 
+                    hairpin_score, dimer_score]
+            writer.writerow(row)
 
 if __name__ == '__main__':
     main()
