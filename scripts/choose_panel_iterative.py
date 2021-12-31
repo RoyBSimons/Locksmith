@@ -649,28 +649,35 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                     'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score']
         writer.writerow(header)
         for i,probe in enumerate(chosen_set):
-            probe_id=int(probe[1].split(':')[-1])
-            locus = description_list[i].split('\t')[0]  # 0 Genomic locus
-            cpg_id = description_list[i].split('\t')[1]  # 1 CpG id
-            probe_sequence = probe[0]  # 2 sequence
-            upstream_sequence = probe_arm_list[i][probe_id][0]  # 3 Upstream arm sequence
-            backbone_sequence = backbone_sequence  # 4 Backbone sequence
-            downstream_sequence = probe_arm_list[i][probe_id][1]  # 5 Downstream arm sequence
-            upstream_locus =  probe_arm_list[i][probe_id][2]  # 6 Genomic location upstream arm
-            downstream_locus = probe_arm_list[i][probe_id][3]  # 7 Genomic location downstream arm
-            target_length = probe_arm_list[i][probe_id][5]  # 8 Target length
-            strandedness = probe_arm_list[i][probe_id][6]  # 9 Which strand is the target strand
-            delta_tm = tms[i][probe_id]  # 10 Difference in Tm between probe arms
-            tm_up = tms_up[i][probe_id]  # 11 Tm upstream arm
-            tm_down = tms_down[i][probe_id]  # 12 Tm downstream arm
-            cpg_conflict = cpg_conflicts[i][probe_id]  # 13 Amount of CpGs in arms
-            snp_conflict = snp_conflicts[i][probe_id]  # 14 Amount of frequent SNPs in arms
-            hairpin_score = hairpin_scores[i][probe_id]  # 15 Hairpin score of probe
-            dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
-            row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus, 
-                    downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict, 
-                    hairpin_score, dimer_score]
-            writer.writerow(row)
+            if probe == None:
+                locus = description_list[i].split('\t')[0]  # 0 Genomic locus
+                cpg_id = description_list[i].split('\t')[1]  # 1 CpG id
+                print('It was not possible to design a probe with the current parameters for target nr '+str(cpg_id))
+                row = [locus, cpg_id]
+                writer.writerow(row)
+            else:
+                probe_id=int(probe[1].split(':')[-1])
+                locus = description_list[i].split('\t')[0]  # 0 Genomic locus
+                cpg_id = description_list[i].split('\t')[1]  # 1 CpG id
+                probe_sequence = probe[0]  # 2 sequence
+                upstream_sequence = probe_arm_list[i][probe_id][0]  # 3 Upstream arm sequence
+                backbone_sequence = backbone_sequence  # 4 Backbone sequence
+                downstream_sequence = probe_arm_list[i][probe_id][1]  # 5 Downstream arm sequence
+                upstream_locus =  probe_arm_list[i][probe_id][2]  # 6 Genomic location upstream arm
+                downstream_locus = probe_arm_list[i][probe_id][3]  # 7 Genomic location downstream arm
+                target_length = probe_arm_list[i][probe_id][5]  # 8 Target length
+                strandedness = probe_arm_list[i][probe_id][6]  # 9 Which strand is the target strand
+                delta_tm = tms[i][probe_id]  # 10 Difference in Tm between probe arms
+                tm_up = tms_up[i][probe_id]  # 11 Tm upstream arm
+                tm_down = tms_down[i][probe_id]  # 12 Tm downstream arm
+                cpg_conflict = cpg_conflicts[i][probe_id]  # 13 Amount of CpGs in arms
+                snp_conflict = snp_conflicts[i][probe_id]  # 14 Amount of frequent SNPs in arms
+                hairpin_score = hairpin_scores[i][probe_id]  # 15 Hairpin score of probe
+                dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
+                row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus,
+                        downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict,
+                        hairpin_score, dimer_score]
+                writer.writerow(row)
 
 if __name__ == '__main__':
     main()

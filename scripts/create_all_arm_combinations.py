@@ -24,7 +24,7 @@ def main():
 
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
         target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
-        score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters set in configuration file
+        score_cutoff, tm_cutoff, max_cpgs_in_arms = import_config(config_file)  # Import parameters set in configuration file
 
     start = time.time()
     cpg_id_list = create_cpg_id_list(bed_file)  # Obtain CpG list from target bed_file
@@ -35,7 +35,7 @@ def main():
                                                                              max_target_length, min_arm_length, 
                                                                              max_arm_length, min_target_length, 
                                                                              max_cg_percentage, cpg_flanks, mid_loc, 
-                                                                             cpg_id_list[i])) for i, record in 
+                                                                             cpg_id_list[i],max_cpgs_in_arms)) for i, record in
                                                      enumerate(SeqIO.parse(handle, "fasta"))]  
             # Create all possible arms taking into account the parameters set in the configuration file
     end = time.time()
@@ -131,6 +131,7 @@ def import_config(config_file):  # import config file
     cpg_flanks = probe_specifics['cpg_flanks']
     max_cg_percentage = float(probe_specifics['max_cg_percentage'])
     min_cg_percentage = float(probe_specifics['min_cg_percentage'])
+    max_cpgs_in_arms = int(probe_specifics["max_cpgs_in_arms"])
 
     # patch backbone together
     backbone = config_object['backbone_sequence'][0]
@@ -148,7 +149,7 @@ def import_config(config_file):  # import config file
 
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold, score_cutoff, tm_cutoff
+        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms
 
 
 def create_cpg_id_list(bed_file):
@@ -161,7 +162,7 @@ def create_cpg_id_list(bed_file):
 
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
-                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id):
+                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id, max_cpgs_in_arms):
     # Obtain the list of possible arm combinations for one record (target CpG in the Fasta file).
     # Each nested value is a list containing the following information:
         # 0 [Sequence Upstream arm
@@ -177,7 +178,7 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
     i = 0
     rev_record = record.reverse_complement()
     record_length = len(record.seq)
-    for target_length in range(min_target_length,
+    for target_length in range(min_target_length,  # Find all arms from + strand
                                max_target_length + 1):  # loop over range of target lengths, including the maximum
         for arm_length_downstream in range(min_arm_length, max_arm_length + 1):
             start_loc_downstream = mid_loc - (target_length - cpg_flanks)
@@ -196,15 +197,15 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                     new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
                     if GC(new_u_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
                         break
-                    else:
-                        pass
+                    elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
+                        break
                     upstream_id = record.id.split(':')[0] + ":" + str(
                         int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream) + "-" + str(
                         int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream + arm_length_upstream - 1)
                     probe = [str(new_u_arm), str(new_d_arm), upstream_id, downstream_id, i, target_length, '+', cpg_id]
                     i += 1
                     probe_list.append(probe)
-    for target_length in range(min_target_length,
+    for target_length in range(min_target_length,  # Find all arms from - strand
                                max_target_length + 1):  # loop over range of target lengths, including the maximum
         for arm_length_downstream in range(min_arm_length, max_arm_length + 1):
             start_loc_downstream = mid_loc - (target_length - cpg_flanks)
@@ -220,8 +221,8 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                     new_u_arm_rev = rev_record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
                     if GC(new_u_arm_rev) > max_cg_percentage or GC(new_u_arm_rev) < min_cg_percentage:
                         break
-                    else:
-                        pass
+                    elif new_d_arm_rev.count('CG') + new_u_arm_rev.count('CG') > max_cpgs_in_arms:
+                        break
                     upstream_id_rev = record.id.split(':')[0] + ":" + str(int(record.id.split(':')[1].split("-")[0]) + (
                                 record_length - start_loc_upstream - arm_length_upstream)) + "-" + str(
                         int(record.id.split(':')[1].split("-")[0]) + (record_length - start_loc_upstream - 1))
