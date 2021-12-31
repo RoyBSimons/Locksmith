@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 #creates a bed file from cglist
-#python ../scripts/cg_illumina_to_hg38_bed.py -c cpglist_horvath.txt -i ~/Documents/Illumina_450K/HM450.hg38.manifest.tsv -o target_list_test.bed -p ~/opt/Locksmith/data/hg38/* -e .bed
 import os
 from argparse import ArgumentParser
 import glob
@@ -26,8 +25,6 @@ for path in full_paths:
             files.add(path)
     else:
         pass
-        #        if (args.recursive):
-#            full_paths += glob.glob(path + '/*')
 chr_list_cpg=[]
 loc_list_cpg=[]
 cpg_list_cpg=[]
@@ -38,11 +35,10 @@ for f in files:
             chr_list_cpg.append(row[0])
             loc_list_cpg.append(row[1])
             cpg_list_cpg.append(row[3])
-print(full_paths)            
+
 cglistfile=args.cglistfile
 illumina_cgid_listfile=args.illumina_cgid_listfile
 outputname=args.outputname
-import csv
 cglist=[]
 
 with open(cglistfile) as inputfile1:
@@ -54,6 +50,7 @@ chr_list=[]
 loc_list=[]
 cpg_list=[]
 strand_list=[]
+counter=1
 with open(illumina_cgid_listfile) as inputfile:
     input_reader=csv.reader(inputfile,delimiter="\t")
     for row in input_reader:
@@ -64,11 +61,8 @@ with open(illumina_cgid_listfile) as inputfile:
             i_chr=[i for i,x in enumerate(chr_list_cpg) if x == row[0]]
             i_loc=[i for i,x in enumerate(loc_list_cpg) if x == str(int(row[1])+1)]
             index=list(set(i_chr).intersection(i_loc))
-            print(index)
-#            print(i_chr)
-#            print(i_loc)
-            print(row[0])
-            print(chr_list_cpg[0])
+            print('Found information for target nr ' + str(counter) + ' out of ' + str(len(cglist)) + ' targets')
+            counter += 1
             cpg_list.append(cpg_list_cpg[index[0]]) #place where loc and chr are both correct
         else:
             pass
@@ -76,5 +70,3 @@ with open(outputname,'w') as handle:
     writer=csv.writer(handle,delimiter='\t')
     for i,loc in enumerate(loc_list):
         writer.writerow([chr_list[i],str(loc),str(loc+1),cpg_list[i],strand_list[i]])
-
-    #os.system("grep chr"+str(chr_list[i])+"'\t'"+str(loc)+"'\t' ./data/CpG_bed_nomenclature/CpG_hg19_chr"+str(chr_list[i])+".bed >> "+outputname+" -h")
