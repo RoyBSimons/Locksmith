@@ -14,9 +14,9 @@ conda create --name Locksmith
 ```
 conda activate Locksmith
 ```
-Install the following packages: biopython-1.79 .
+Install the following packages: biopython=1.79 .
 ```
-conda install -c conda-forge biopython-1.79
+conda install -c conda-forge biopython=1.79
 ```
 
 ### Preprocessing
