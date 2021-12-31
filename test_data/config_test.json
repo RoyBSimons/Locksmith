@@ -51,5 +51,5 @@
             }
         ],
     "permutations": "100",
-    "max_threads": "30"
+    "max_threads": "10"
 }
