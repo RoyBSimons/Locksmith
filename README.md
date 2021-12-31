@@ -143,6 +143,14 @@ The configuration file which is needed to run Locksmith includes all initial par
 - "score_cutoff": Dimer score threshold for reporting dimers.
 - "tm_cutoff": Dimer Tm threshold for reporting dimers.
 
+"scoring_weights": Weights for calculating the probe cost.
+- "hairpin": Hairpin weight
+- "cpg": CpG weight
+- "snp": SNP weight
+- "tm": Tm weight
+
+Formula: Hairpin_score * hairpin_weight + nr_of_cpgs_in_arms * cpg_weight + nr_of_snps_in_arms * snp_weight + Tm_difference_between_arms * tm_weight
+
 "permutations": Maximum amount of iterations to be performed before choosing the panel with the least amount of dimers.
 
 "max_threads": Maximum amount of threads that will be used by Locksmith

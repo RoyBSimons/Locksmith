@@ -28,7 +28,8 @@ def main():
     conflicting_file = args["conflicting_file"]
     panel_output_file = args['panel_output_file']
 
-    permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff = import_config(config_file)  # Import parameters from configuration file.
+    permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights \
+        = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
@@ -36,7 +37,7 @@ def main():
                                                                                             cpgs, snps, hairpins,
                                                                                             probe_arms_file)  # Import output create probe rule.
 
-    probe_costs = get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_scores)  # Obtain probe costs from delta Tm, hairpin formation, CpG and SNP conflicts.
+    probe_costs = get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_scores, scoring_weights)  # Obtain probe costs from delta Tm, hairpin formation, CpG and SNP conflicts.
     print('\tProbe costs computed')
 
     # Iteratively exclude the most dimer forming probes.
@@ -133,7 +134,8 @@ def import_config(config_file):
     seed = int(config_object['seed'])
     score_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['score_cutoff'])
     tm_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['tm_cutoff'])
-    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff
+    scoring_weights = config_object['scoring_weights'][0]
+    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights
 
 
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
@@ -244,10 +246,14 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
         arm_downstream_list, possible_arm_combinations_all_targets, tms_up, tms_down
 
 
-def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array):
+def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array, scoring_weights):
     # Calculate probe cost from delta tm, hairpin formation and CpG and SNP conflicts.
     # Cost = (hairpin * 10^10)+ CpG conflicts + SNP conflicts + delta_tm
-    probe_cost = np.add(np.add(np.add(np.add(np.multiply(hairpin_array, int(10**10)),np.multiply(cpg_conflicts,int(10**5))),np.multiply(snp_conflicts,int(10**5))), np.multiply(tms,int(10**4))),1)
+    weight_hairpin = int(scoring_weights['hairpin'])
+    weight_cpg = int(scoring_weights['cpg'])
+    weight_snp = int(scoring_weights['snp'])
+    weight_tm = int(scoring_weights['tm'])
+    probe_cost = np.add(np.add(np.add(np.add(np.multiply(hairpin_array, weight_hairpin),np.multiply(cpg_conflicts,weight_cpg)),np.multiply(snp_conflicts,weight_snp)), np.multiply(tms,weight_tm)),1)
     # Score is at least 1
     return probe_cost
 
