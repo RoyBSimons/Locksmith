@@ -460,8 +460,6 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
             dimer_end_num = dimer_start_num + len(dimer_structure)
             dimer_start_num2 = a_seq_dangling - s_2_dangling
             dimer_end_num2 = dimer_start_num2 + len(dimer_structure)
-            conflicting_cpg_list_dimer.append(cpg_id)
-            conflicting_cpg_list_dimer2.append(cpg_id2)
             probe_index = probe_cpg_id_list.index(cpg_id.split(':')[0])
             nested_index = probe_id_list[probe_index].index(cpg_id)
             probe_index2 = probe_cpg_id_list.index(cpg_id2.split(':')[0])
@@ -477,6 +475,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                            probe_index, nested_index, dimer_start_num, dimer_end_num,
                                                            dimer)
                     conflict_range_dimer.append(dimer_range)
+                    conflicting_cpg_list_dimer.append(cpg_id)
                 elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
@@ -484,6 +483,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                              arm_downstream_loc_list, probe_index, nested_index,
                                                              dimer_start_num, dimer_end_num, s1_length, dimer)
                     conflict_range_dimer.append(dimer_range)
+                    conflicting_cpg_list_dimer.append(cpg_id)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
@@ -496,6 +496,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                            probe_index, nested_index, dimer_start_num, dimer_end_num,
                                                            dimer)
                     conflict_range_dimer.append(dimer_range)
+                    conflicting_cpg_list_dimer.append(cpg_id)
                 elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
                         "'")):  # dimer is in downstream arm
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
@@ -503,6 +504,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                              arm_downstream_loc_list, probe_index, nested_index,
                                                              dimer_start_num, dimer_end_num, s1_length, dimer)
                     conflict_range_dimer.append(dimer_range)
+                    conflicting_cpg_list_dimer.append(cpg_id)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
@@ -518,6 +520,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                             arm_upstream_loc_list, probe_index2, nested_index2,
                                                             dimer_start_num2, dimer_end_num2, dimer)
                     conflict_range_dimer2.append(dimer_range2)
+                    conflicting_cpg_list_dimer2.append(cpg_id2)
                 elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
@@ -525,6 +528,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                               arm_downstream_loc_list, probe_index2, nested_index2,
                                                               dimer_start_num2, dimer_end_num2, s2_length, dimer)
                     conflict_range_dimer2.append(dimer_range2)
+                    conflicting_cpg_list_dimer2.append(cpg_id2)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
@@ -537,6 +541,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                             arm_upstream_loc_list, probe_index2, nested_index2,
                                                             dimer_start_num2, dimer_end_num2, dimer)
                     conflict_range_dimer2.append(dimer_range2)
+                    conflicting_cpg_list_dimer2.append(cpg_id2)
                 elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
                         "'")):  # dimer is in downstream arm.
                     # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
@@ -544,6 +549,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                               arm_downstream_loc_list, probe_index2, nested_index2,
                                                               dimer_start_num2, dimer_end_num2, s2_length, dimer)
                     conflict_range_dimer2.append(dimer_range2)
+                    conflicting_cpg_list_dimer2.append(cpg_id2)
                 else:  # dimer forming region is in backbone,
                     # only report the other probe that forms the dimer together with this probe.
                     pass
