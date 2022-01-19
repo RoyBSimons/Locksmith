@@ -49,7 +49,7 @@ def main():
 
     # Create a bedfile for all possible upstream and downstream arms.
     # This file is used for the create_conflicting_indices_list_bedtools function inside the increase_costs_dimer_forming_probes_iterative function.
-    loci_bedfile_name = outputdir + 'combined.bed'
+    loci_bedfile_name = outputdir + 'possible_probe_info/combined.bed'
     write_nested_loci_to_bedfile(loci_bedfile_name, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
 
     #Loop to choose probes and rescore dimer-forming probes untill the maximum amount of iterations is encountered or there are no dimer-forming probes in the panel.
@@ -87,7 +87,7 @@ def main():
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
                 panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
                 hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down)  # Write the output to a file.
-
+    os.system('rm ' + outputdir + '/possible_probe_info/combined.bed')
 
 def get_arg_parser():
     parser = ArgumentParser()
@@ -164,11 +164,11 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
     with open(tms_file, 'rb') as handle:
         tms = pickle.load(handle)
         tms = np.array(tms, dtype=object)
-    tms_up_file = tms_file[:-4]+'_up'+tms_file[-4:]
+    tms_up_file = tms_file[:-7]+'_up'+tms_file[-7:]
     with open(tms_up_file, 'rb') as handle:
         tms_up = pickle.load(handle)
         tms_up = np.array(tms_up, dtype=object)
-    tms_down_file = tms_file[:-4]+'_down'+tms_file[-4:]
+    tms_down_file = tms_file[:-7]+'_down'+tms_file[-7:]
     with open(tms_down_file, 'rb') as handle:
         tms_down = pickle.load(handle)
         tms_down = np.array(tms_down, dtype=object)
@@ -395,7 +395,7 @@ def write_loci_to_bedfile(output_name, loci_list):
 def create_conflicting_indices_list_bedtools(dimer_range_list, dimer_bedfile_name, bedfile_intersect_name, outputdir):
     write_loci_to_bedfile(dimer_bedfile_name, dimer_range_list)
     # Do bedtools intersect here on combined_loci_bedfile_name and dimer_bedfile_name
-    os.system('bedtools intersect -wa -s -a ' + outputdir + 'combined.bed -b ' + dimer_bedfile_name + ' -f 7E-9 > ' 
+    os.system('bedtools intersect -wa -s -a ' + outputdir + 'possible_probe_info/combined.bed -b ' + dimer_bedfile_name + ' -f 7E-9 > ' 
               + bedfile_intersect_name)
     # obtain identifier from bedfile_intersect_name
     new_conflicting_indices_list = []
@@ -565,8 +565,8 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
     all_conflicting_probe_list = []
     conflicting_targets = set([])
     print('Dimer ranges obtained')
-    dimer_bedfile_name = outputdir + 'conflicting_dimer.bed'
-    bedfile_intersect_name = outputdir + 'conflicting_loci.bed'
+    dimer_bedfile_name = outputdir + 'conflict_info/conflicting_dimer.bed'
+    bedfile_intersect_name = outputdir + 'conflict_info/conflicting_loci.bed'
     new_conflicting_indices_list = create_conflicting_indices_list_bedtools(most_conflicting_dimer_range_list,
                                                                             dimer_bedfile_name, bedfile_intersect_name,
                                                                             outputdir)
@@ -599,7 +599,7 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
     with open(targets,'r') as handle:
         reader = csv.reader(handle, delimiter = '\t')
         for row in reader:
-            genomic_loci=row[0]+':'+str((int(row[1])+int(row[2])+1)/2)
+            genomic_loci=row[-1]
             genomic_loci_list.append(genomic_loci)
 
 
@@ -608,8 +608,8 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
         pass
     else:
         for dindex, dimer in enumerate(dimerlist):
-            cpg_loc1 = dimer['S1']['Desc'].split('\t')[0]
-            cpg_loc2 = dimer['S2']['Desc'].split('\t')[0]
+            cpg_loc1 = dimer['S1']['ID'].split(':')[0]
+            cpg_loc2 = dimer['S2']['ID'].split(':')[0]
             tm = round(float(dimer['Tm']),2)
             for genomic_loci in [cpg_loc1,cpg_loc2]:
                 index = genomic_loci_list.index(genomic_loci)

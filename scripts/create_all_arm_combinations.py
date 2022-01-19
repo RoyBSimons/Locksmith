@@ -389,29 +389,30 @@ def obtain_snps(probe_list, bed_path, freq_threshold, ftp_path_snp_database, acc
 def create_output_files(output_dir, tms, cpg_conflicts, possible_probes_all_targets, hairpin_scores, snp_conflicts,
                         possible_arm_combinations_all_targets, tms_up, tms_down):
     start = time.time()
-    with open(output_dir + 'tms.csv', 'wb') as file:
+    probe_info_dir='possible_probe_info/'
+    with open(output_dir + probe_info_dir + 'tms.pickle', 'wb') as file:
         pickle.dump(tms, file)
-    with open(output_dir + 'cpg_conflicts.csv', 'w') as file:
+    with open(output_dir + probe_info_dir + 'cpg_conflicts.csv', 'w') as file:
         for item in cpg_conflicts:
             file.write(",".join(map(str, item)))
             file.write("\n")
-    with open(output_dir + 'possible_probes_all_targets.csv', 'w') as file:
+    with open(output_dir + probe_info_dir + 'possible_probes_all_targets.csv', 'w') as file:
         for item in possible_probes_all_targets:
             file.write(",".join(map(str, item)))
             file.write("\n")
-    with open(output_dir + 'hairpin_scores.csv', 'w') as file:
+    with open(output_dir + probe_info_dir + 'hairpin_scores.csv', 'w') as file:
         for item in hairpin_scores:
             file.write(",".join(map(str, item)))
             file.write("\n")
-    with open(output_dir + 'snp_conflicts.csv', 'w') as file:
+    with open(output_dir + probe_info_dir + 'snp_conflicts.csv', 'w') as file:
         for item in snp_conflicts:
             file.write(",".join(map(str, item)))
             file.write("\n")
-    with open(output_dir + 'probe_arms.csv', 'wb') as file:
+    with open(output_dir + probe_info_dir + 'probe_arms.pickle', 'wb') as file:
         pickle.dump(possible_arm_combinations_all_targets, file)
-    with open(output_dir + 'tms_down.csv', 'wb') as file:
+    with open(output_dir + probe_info_dir + 'tms_down.pickle', 'wb') as file:
         pickle.dump(tms_up, file)
-    with open(output_dir + 'tms_up.csv', 'wb') as file:
+    with open(output_dir + probe_info_dir + 'tms_up.pickle', 'wb') as file:
         pickle.dump(tms_down, file)
     end = time.time()
     print(end - start)
