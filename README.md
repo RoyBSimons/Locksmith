@@ -1,5 +1,4 @@
 # Locksmith Docs
-
 ## Installing Locksmith
 Clone the repository with the following command:
 ```
@@ -7,17 +6,129 @@ $ git clone https://github.com/RoySimons96/Locksmith.git
 ```
 Enter the repository by `cd Locksmith`.
 
-Create a new conda environment.
+## Dependencies
+- [Bedtools v2.29.1](https://github.com/arq5x/bedtools2/releases/tag/v2.30.0)
+
+Download the right version of bedtools
 ```
-conda create --name Locksmith
+wget https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary
 ```
+Rename the file
+```
+mv bedtools.static.binary bedtools
+```
+Make sure the file has the executable permission
+```
+chmod a+x bedtools
+```
+Export the executable to PATH
+```
+export PATH=<Path to bedtools executable>:$PATH
+```
+- [mfeprimer V3.2.4](https://github.com/quwubin/MFEprimer-3.0/releases/tag/v3.2.4)
+
+Download the right version of mfeprimer
+```
+wget -c https://github.com/quwubin/MFEprimer-3.0/releases/download/v3.2.4/mfeprimer-3.2.4-linux-amd64.gz
+```
+Uncompress the file
+```
+gunzip mfeprimer-3.2.4-linux-amd64.gz
+```
+Rename the file
+```
+mv mfeprimer-3.2.4-linux-amd64 mfeprimer
+```
+Make sure the file has the executable permission
+```
+chmod a+x mfeprimer
+```
+Export the executable to PATH
+```
+export PATH=<Path to mfeprimer executable>:$PATH
+```
+- [tabix (htslib) 1.10.2](https://github.com/samtools/htslib/releases/tag/1.10.2)
+
+Download tabix 
+```
+wget https://github.com/samtools/htslib/releases/download/1.10/htslib-1.10.tar.bz2
+```
+Untar the tabix file
+```
+tar -xvf htslib-1.10.tar.bz2
+```
+Change working directory
+```
+cd htslib-1.10
+```
+Install tabix
+```
+make
+```
+```
+make install
+```
+Export the executable to PATH
+```
+export PATH=<Path to tabix executable>:$PATH
+```
+### Set up conda environment
+- Download [Conda](https://www.anaconda.com/products/individual) with Python 3.9
+
+```
+wget https://repo.anaconda.com/archive/Anaconda3-2021.11-Linux-x86_64.sh
+```
+
+Install Conda
+```
+bash Anaconda3-2021.11-Linux-x86_64.sh
+```
+
+- [Snakemake](https://snakemake.readthedocs.io/) (at least v4.3.1) and [biopython-1.79](https://biopython.org/docs/1.79/api/Bio.html)
+
+Install Mamba into your Conda-based python distribution
+```
+conda install -n base -c conda-forge mamba
+```
+Activate the Conda base environment (which now includes Mamba).
+```
+conda activate base
+```
+Create a new conda environment called ```Locksmith``` with snakemake in it.
+```
+mamba create -c conda-forge -c bioconda -n snakemake Locksmith
+```
+Activate the ```Locksmith``` conda environment.
 ```
 conda activate Locksmith
+```
+Check whether Snakemake is succesfully installed by running the following command:
+```
+snakemake --help
 ```
 Install the following packages: biopython=1.79 .
 ```
 conda install -c conda-forge biopython=1.79
 ```
+## Running Locksmith
+Go into the Locksmith directory by:
+```
+cd <Path to Locksmith>
+```
+Make sure to activate the conda environment by: 
+```
+conda activate Locksmith
+```
+```
+snakemake --cores [amount of cores] --configfile [path to config file]
+```
+### Test run
+In order to perform a testrun of Locksmith go into the Locksmith directory and execute the following command:
+```
+snakemake --cores [amount of cores] --configfile test_data/config_test.json
+```
+
+
 
 ### Preprocessing
 Before running Locksmith several files are needed:
@@ -61,36 +172,6 @@ python scripts/preprocessing/cg_illumina_to_target_bedfile.py -c <Path to Illumi
 The Illumina manifest file can be obtained at e.g. https://webdata.illumina.com/downloads/productfiles/humanmethylation450/humanmethylation450_15017482_v1-2.csv 
 
 The Illumina cg identifier file is a headerless file with only the Illumina cg identifier for each target per row.
-
-
-## Dependencies
-- Python 3.9.0
-- Snakemake v4.3.1
-- Bedtools v2.29.1
-- Primer3 v2.5.0
-- mfeprimer V3.0
-- tabix (htslib) 1.10.2
-
-### Python packages
-biopython-1.79
-## Running Locksmith
-Go into the Locksmith directory by:
-```
-cd <Path to Locksmith>
-```
-Make sure to activate the conda environment by: 
-```
-conda activate Locksmith
-```
-```
-snakemake --cores [amount of cores] --configfile [path to config file]
-```
-### Test run
-Check whether the local paths of the Locksmith/test_data/config_test.json file are all correct.
-In order to perform a testrun of Locksmith go into the Locksmith directory and execute the following command:
-```
-snakemake --cores [amount of cores] --configfile [path to Locksmith directory]/test_data/config_test.json
-```
 
 ### Configuration
 The configuration file which is needed to run Locksmith includes all initial parameters needed to create probes and select a probe panel.
