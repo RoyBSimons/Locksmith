@@ -24,7 +24,7 @@ def main():
 
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
         target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
-        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm = import_config(config_file)  # Import parameters set in configuration file
+        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe = import_config(config_file)  # Import parameters set in configuration file
 
     start = time.time()
     cpg_id_list = create_cpg_id_list(bed_file)  # Obtain CpG list from target bed_file
@@ -53,7 +53,7 @@ def main():
 
     #Remove all possible arms that have a delta Tm that passed the maximum threshold.
     possible_arm_combinations_all_targets, tms, tms_up, tms_down = remove_arm_combinations_max_delta_tm(possible_arm_combinations_all_targets,
-                                                                                                        tms, tms_up, tms_down, max_delta_tm)
+                                                                                                        tms, tms_up, tms_down, max_delta_tm_probe)
 
     start = time.time()
     cpg_conflicts = report_cpgs_in_arms(possible_arm_combinations_all_targets)  
@@ -137,7 +137,7 @@ def import_config(config_file):  # import config file
     max_cg_percentage = float(probe_specifics['max_cg_percentage'])
     min_cg_percentage = float(probe_specifics['min_cg_percentage'])
     max_cpgs_in_arms = int(probe_specifics["max_cpgs_in_arms"])
-    max_delta_tm = float(probe_specifics["max_delta_tm"])
+    max_delta_tm_probe = float(probe_specifics["max_delta_tm_probe"])
 
     # patch backbone together
     backbone = config_object['backbone_sequence'][0]
@@ -155,7 +155,7 @@ def import_config(config_file):  # import config file
 
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm
+        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe
 
 
 def create_cpg_id_list(bed_file):
@@ -263,14 +263,14 @@ def get_delta_tm_array(probe_arms_array):
            range(len(A))])
     return tms, tm_up, tm_down
 
-def remove_arm_combinations_max_delta_tm(possible_arm_combinations_all_targets, tms, tms_up, tms_down, max_delta_tm):
+def remove_arm_combinations_max_delta_tm(possible_arm_combinations_all_targets, tms, tms_up, tms_down, max_delta_tm_probe):
     boolean_array = []
     new_tms = []
     new_tms_down = []
     new_tms_up = []
     new_possible_arm_combinations_all_targets = []
     for i, row in enumerate(tms):
-        boolean_row = np.array(row < max_delta_tm, dtype=bool)  # Create a boolean array with all values that are lower than the delta Tm threshold.
+        boolean_row = np.array(row < max_delta_tm_probe, dtype=bool)  # Create a boolean array with all values that are lower than the delta Tm threshold.
         new_tms.append(tms[i][boolean_row])  # Keep arm combinations which have a smaller delta Tm than the threshold.
         new_tms_down.append(tms_down[i][boolean_row]) # Construct new tms_down array
         new_tms_up.append(tms_up[i][boolean_row])  # Construct new tms_up array

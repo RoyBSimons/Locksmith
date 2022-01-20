@@ -9,6 +9,7 @@ from numpy.random import choice
 import csv
 import numpy as np
 import pickle
+import statistics
 
 
 def main():
@@ -28,8 +29,8 @@ def main():
     conflicting_file = args["conflicting_file"]
     panel_output_file = args['panel_output_file']
 
-    permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights \
-        = import_config(config_file)  # Import parameters from configuration file.
+    permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, \
+            scoring_weights, max_delta_tm_panel = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
@@ -44,8 +45,10 @@ def main():
     chosen_probes_lists = []
     probes_with_dimers_lists = []
     conflicting_probe_list = []
+    tm_amount_out_of_range_list = []
     counter = 0
     min_dimers = len(possible_probes_all_targets)
+    tm_amount_out_of_range = 1
 
     # Create a bedfile for all possible upstream and downstream arms.
     # This file is used for the create_conflicting_indices_list_bedtools function inside the increase_costs_dimer_forming_probes_iterative function.
@@ -53,7 +56,7 @@ def main():
     write_nested_loci_to_bedfile(loci_bedfile_name, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
 
     #Loop to choose probes and rescore dimer-forming probes untill the maximum amount of iterations is encountered or there are no dimer-forming probes in the panel.
-    while counter < permutations and min_dimers > 0:
+    while counter < permutations and (min_dimers > 0 or tm_amount_out_of_range > 0):
         # Choose probe set based on probability which is set by cost of a probe.
         chosen_probes = [choose_probes_from_costs(probe_costs[i], possible_arm_combinations,
                                                     permutations, counter, probe_id_list[i],
@@ -65,7 +68,7 @@ def main():
         chosen_probes_lists.append(chosen_probes) #Keep panel of probes for later.
 
         # Increase cost of probes that are chosen as conflicting probes.
-        # The dimer exlcusion factor determines the percentage of dimer-forming probes that are reported as conflicting.
+        # The dimer exclusion factor determines the percentage of dimer-forming probes that are reported as conflicting.
         probes_with_dimers, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes = \
             increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets, 
                                                           chosen_probes, probe_costs, probe_cpg_id_list, 
@@ -73,15 +76,31 @@ def main():
                                                           arm_upstream_loc_list, arm_downstream_loc_list, 
                                                           exclusion_factor, outputdir, score_cutoff, tm_cutoff)
 
+        # Increase cost of all probes (also not-chosen probes) that do not fall into the panel Tm range.
+        # Tm is out of bounds when it is outside of: median Tm + or - half of the Tm range threshold.
+        probe_costs, tm_amount_out_of_range = increase_cost_probes_with_out_of_bounds_tm(chosen_probes,
+                probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel)
+        tm_amount_out_of_range_list.append(tm_amount_out_of_range)
         nr_of_dimer_probes = len(cpgs_of_dimer_forming_probes)
         probes_with_dimers_lists.append(nr_of_dimer_probes)
         conflicting_probe_list.append(probes_with_dimers)
-        print('\t' + str(nr_of_dimer_probes) + ' out of ' + str(len(chosen_probes)) + ' probes form a dimer')
+        print('\t\t' + str(nr_of_dimer_probes) + ' out of ' + str(len(chosen_probes)) + ' probes form a dimer')
+        print('\t\t' + str(tm_amount_out_of_range) + ' out of ' + str(len(chosen_probes)*2)+ ' annealing sites are outside the Tm range')
         min_dimers = min(nr_of_dimer_probes, min_dimers)  # Store the minimum number of dimers, to choose this panel after all iterations.
         counter += 1
 
-    chosen_set_index = probes_with_dimers_lists.index(min(probes_with_dimers_lists))  # Find index of panel with the least amount of dimers.
+    chosen_set_index_list = [ i for i,val in enumerate(probes_with_dimers_lists) if val == min_dimers ]  # Find index of panel with the least amount of dimers.
+    if len(chosen_set_index_list) == 1:
+        chosen_set_index = chosen_set_index_list[0]
+    else:  # There are multiple panels with the same minimum amount of dimers. Keep the one with the least amount of probes out of the Tm range.
+         min_tm_low_dimer_panels = [ tm_amount_out_of_range_list[index] for index in chosen_set_index_list]
+         min_tm_chosen_panel = min(min_tm_low_dimer_panels)
+         chosen_set_index = chosen_set_index_list[min_tm_low_dimer_panels.index(min_tm_chosen_panel)]
     chosen_set = chosen_probes_lists[chosen_set_index]  # Get panel with the least amount of dimers.
+    print('\nStatistics of probe panel created by Locksmith:')
+    print('\tMinimal number of dimers is ' + str(min_dimers))
+    print('\tAmount of annealing sites outside of Tm range is ' + str(min_tm_chosen_panel))
+
     dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets)
 
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
@@ -135,7 +154,8 @@ def import_config(config_file):
     score_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['score_cutoff'])
     tm_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['tm_cutoff'])
     scoring_weights = config_object['scoring_weights'][0]
-    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights
+    max_delta_tm_panel = int(config_object["probe_specifics"][0]["max_delta_tm_panel"])
+    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel
 
 
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
@@ -564,7 +584,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
     # Find all probes that have common regions with the most_conflicting_dimer_range and report as conflicting probes
     all_conflicting_probe_list = []
     conflicting_targets = set([])
-    print('Dimer ranges obtained')
+    print('\t\t'+'Dimer ranges obtained')
     dimer_bedfile_name = outputdir + 'conflict_info/conflicting_dimer.bed'
     bedfile_intersect_name = outputdir + 'conflict_info/conflicting_loci.bed'
     new_conflicting_indices_list = create_conflicting_indices_list_bedtools(most_conflicting_dimer_range_list,
@@ -577,12 +597,52 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
         all_conflicting_probe_list.append(probe_id_list[i][j])
         conflicting_targets.add(probe_id_list[i][0].split(':')[0])
         probe_costs[i][j] = probe_costs[i][j] + float(10 ** 10)  # Increase cost of conflicting probe
-    print(str(len(conflicting_targets)) + ' conflicts found')
     return all_conflicting_probe_list, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes
 
+def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel):
+    # Get indices of chosen_probes
+    indices=[]
+    for i,probe in enumerate(chosen_probes):
+        if probe == None:
+            pass
+        else:
+            probe_id = probe[1]
+            index = probe_id_list[i].index(probe_id)
+            indices.append([i,index])
+    # Find median Tm of chosen panel
+    tm_up_list = [tms_up[index[0]][index[1]] for index in indices]
+    tm_down_list = [tms_down[index[0]][index[1]] for index in indices]
+    tm_list = tm_up_list + tm_down_list
+    median_tm = statistics.median(tm_list)
+    upperbound_tm = median_tm + 0.5 * max_delta_tm_panel  # Set upper Tm limit.
+    lowerbound_tm = median_tm - 0.5 * max_delta_tm_panel  # Set lower Tm limit.
+    weight_tm = int(scoring_weights['tm'])
+    
+    # Find amount of chosen probes that have a Tm outside of the Tm range around the median Tm.
+    tm_amount_out_of_range = sum(tm_list > upperbound_tm) + sum(tm_list < lowerbound_tm)
+
+    # Find all probes that have a Tm outside of the Tm range around the median Tm.
+    # Add the following amount to the score: scoring weight Tm * difference between probe Tm and median Tm.
+    increase_1 = np.array([np.where(row < upperbound_tm, row , np.multiply(np.abs(np.subtract(row,median_tm)),weight_tm)) for row in tms_down],dtype = object)
+    increase_2 = np.array([np.where(row > lowerbound_tm, row , np.multiply(np.abs(np.subtract(row,median_tm)),weight_tm)) for row in tms_down],dtype = object)
+    increase_3 = np.array([np.where(row < upperbound_tm, row , np.multiply(np.abs(np.subtract(row,median_tm)),weight_tm)) for row in tms_up],dtype = object)
+    increase_4 = np.array([np.where(row > lowerbound_tm, row , np.multiply(np.abs(np.subtract(row,median_tm)),weight_tm)) for row in tms_up],dtype = object)
+    total_increase = np.add(np.add(increase_1,increase_2),np.add(increase_3,increase_4))
+    new_probe_costs = np.add(probe_costs, total_increase)
+    return new_probe_costs, tm_amount_out_of_range
 
 def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
-     # Test the chosen probes set for dimers
+    # Create a fasta file with the chosen probes in this iteration.
+    passed_list = []
+    with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
+        for i, probe in enumerate(chosen_set):
+            if probe is None:
+                passed_list.append(i)
+            else:
+                handle.write('>' + probe[1] + '\n')
+                handle.write(probe[0] + '\n')
+
+    # Test the chosen probes set for dimers
     os.system(
         'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
     # Score cut-off and temperature cut-off are set in configuration file
@@ -621,8 +681,6 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
     # Write the output of the Choose_probes rule.
         # 1. Fasta file with chosen panel
         # 2. Tab delimiter file with conflicting probes per iteration
-
-    print('minimal number of dimers is ' + str(min_dimers))
 
     # Create discriptions for chosen probes, based on the targets.
     seq_list = []
