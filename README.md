@@ -167,9 +167,9 @@ chr1  1232656 1232657 CpG23295  -
 ```
 This file can be created with the following command:
 ```
-python scripts/preprocessing/cg_illumina_to_target_bedfile.py -c <Path to Illumina cg identifier file> -i <Path to Illumina manifest file> -o <output_file_name> -p <Path to directory with CpG bedfiles>*.bed -e .bed
+python scripts/preprocessing/cg_illumina_to_target_bedfile.py -c <Path to Illumina cg identifier file> -i <Path to Infinium annotation file> -o <output_file_name> -p <Path to directory with CpG bedfiles>*.bed -e .bed
 ```
-The Illumina manifest file can be obtained at e.g. https://webdata.illumina.com/downloads/productfiles/humanmethylation450/humanmethylation450_15017482_v1-2.csv 
+The Infinium annotation file can be obtained at e.g. https://zhouserver.research.chop.edu/InfiniumAnnotation/20180909/HM450/HM450.hg38.manifest.tsv.gz
 
 The Illumina cg identifier file is a headerless file with only the Illumina cg identifier for each target per row.
 
