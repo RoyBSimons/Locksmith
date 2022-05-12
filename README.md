@@ -25,19 +25,19 @@ Export the executable to PATH
 ```
 export PATH=<Path to bedtools executable>:$PATH
 ```
-- [mfeprimer V3.2.4](https://github.com/quwubin/MFEprimer-3.0/releases/tag/v3.2.4)
+- [mfeprimer V3.2.6](https://github.com/quwubin/MFEprimer-3.0/releases/tag/v3.2.6)
 
 Download the right version of mfeprimer
 ```
-wget -c https://github.com/quwubin/MFEprimer-3.0/releases/download/v3.2.4/mfeprimer-3.2.4-linux-amd64.gz
+wget -c https://github.com/quwubin/MFEprimer-3.0/releases/download/v3.2.6/mfeprimer-3.2.6-linux-amd64.gz
 ```
 Uncompress the file
 ```
-gunzip mfeprimer-3.2.4-linux-amd64.gz
+gunzip mfeprimer-3.2.6-linux-amd64.gz
 ```
 Rename the file
 ```
-mv mfeprimer-3.2.4-linux-amd64 mfeprimer
+mv mfeprimer-3.2.6-linux-amd64 mfeprimer
 ```
 Make sure the file has the executable permission
 ```
@@ -167,9 +167,9 @@ chr1  1232656 1232657 CpG23295  -
 ```
 This file can be created with the following command:
 ```
-python scripts/preprocessing/cg_illumina_to_target_bedfile.py -c <Path to Illumina cg identifier file> -i <Path to Illumina manifest file> -o <output_file_name> -p <Path to directory with CpG bedfiles>*.bed -e .bed
+python scripts/preprocessing/cg_illumina_to_target_bedfile.py -c <Path to Illumina cg identifier file> -i <Path to Infinium annotation file> -o <output_file_name> -p <Path to directory with CpG bedfiles>*.bed -e .bed
 ```
-The Illumina manifest file can be obtained at e.g. https://webdata.illumina.com/downloads/productfiles/humanmethylation450/humanmethylation450_15017482_v1-2.csv 
+The Infinium annotation file can be obtained at e.g. https://zhouserver.research.chop.edu/InfiniumAnnotation/20180909/HM450/HM450.hg38.manifest.tsv.gz
 
 The Illumina cg identifier file is a headerless file with only the Illumina cg identifier for each target per row.
 
