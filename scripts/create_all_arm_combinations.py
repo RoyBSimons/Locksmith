@@ -76,7 +76,7 @@ def main():
     output_name_json = 'temp_test_json'
     with mp.Pool(nr_of_cores) as pool_handle:
         hairpin_scores = [pool_handle.apply(check_probe_for_hairpin_score, 
-                                            args=(possible_probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff))
+                                            args=(possible_probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff, nr_of_cores))
                           for index, possible_probes in enumerate(possible_probes_all_targets)]  
         # Obtain a 2D array containing the hairpin information of all created padlock probes. 
         # Each row consist of an array of integers; a 0 when no hairpin is formed, a 1 when a hairpin is formed.
@@ -292,7 +292,7 @@ def add_backbone_array(probe_arms_array, backbone_sequence):
     return probe_array
 
 
-def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff):
+def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, score_cutoff, tm_cutoff, nr_of_cores):
     # Report score of hairpin when a probe forms one; else report a zero.
     seq_list = []
     list_len = len(probes)
@@ -304,7 +304,7 @@ def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, index, s
             seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe), id=probe_name))
         SeqIO.write(seq_list, output_handle, 'fasta')
     os.system('mfeprimer hairpin --in ' + fasta_name + str(index) + '.fa -j -o ' + output_name_json + str(
-        index) + ' -s '+str(score_cutoff)+' -t '+str(tm_cutoff))  # Remove/move the output files;
+        index) + ' -s ' + str(score_cutoff) + ' -t ' + str(tm_cutoff) + ' -c ' + str(nr_of_cores))  # Remove/move the output files;
     # Report hairpins which go over the set thresholds for score and Tm
     with open(output_name_json + str(index) + '.json') as jsonFile:
         hairpin_list = json.load(jsonFile)

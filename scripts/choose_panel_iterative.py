@@ -75,7 +75,7 @@ def main():
                                                           chosen_probes, probe_costs, probe_cpg_id_list, 
                                                           probe_id_list, arm_upstream_list, arm_downstream_list, 
                                                           arm_upstream_loc_list, arm_downstream_loc_list, 
-                                                          exclusion_factor, outputdir, score_cutoff, tm_cutoff)
+                                                          exclusion_factor, outputdir, score_cutoff, tm_cutoff, nr_of_cores)
 
         # Increase cost of all probes (also not-chosen probes) that do not fall into the panel Tm range.
         # Tm is out of bounds when it is outside of: median Tm + or - half of the Tm range threshold.
@@ -102,7 +102,7 @@ def main():
     print('\tMinimal number of dimers is ' + str(min_dimers))
     print('\tAmount of annealing sites outside of Tm range is ' + str(min_tm_chosen_panel))
 
-    dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets)
+    dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores)
 
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
                 panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
@@ -433,7 +433,7 @@ def create_conflicting_indices_list_bedtools(dimer_range_list, dimer_bedfile_nam
 def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets, chosen_probes, probe_costs,
                                                   probe_cpg_id_list, probe_id_list, arm_upstream_list,
                                                   arm_downstream_list, arm_upstream_loc_list, arm_downstream_loc_list,
-                                                  exclusion_factor, outputdir, score_cutoff, tm_cutoff):
+                                                  exclusion_factor, outputdir, score_cutoff, tm_cutoff, nr_of_cores):
     # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
     with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
@@ -446,7 +446,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
 
     # Test the chosen probes set for dimers
     os.system(
-        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
+        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
     # Score cut-off and temperature cut-off are set in configuration file
 
     # Obtain dimer list from mfeprimer output
@@ -632,7 +632,7 @@ def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, pro
     new_probe_costs = np.add(probe_costs, total_increase)
     return new_probe_costs, tm_amount_out_of_range
 
-def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
+def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores):
     # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
     with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
@@ -645,7 +645,7 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets):
 
     # Test the chosen probes set for dimers
     os.system(
-        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff))
+        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
     # Score cut-off and temperature cut-off are set in configuration file
 
     # Obtain dimer list from mfeprimer output
