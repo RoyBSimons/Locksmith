@@ -93,6 +93,7 @@ def main():
     chosen_set_index_list = [ i for i,val in enumerate(probes_with_dimers_lists) if val == min_dimers ]  # Find index of panel with the least amount of dimers.
     if len(chosen_set_index_list) == 1:
         chosen_set_index = chosen_set_index_list[0]
+        min_tm_chosen_panel = tm_amount_out_of_range_list[chosen_set_index]
     else:  # There are multiple panels with the same minimum amount of dimers. Keep the one with the least amount of probes out of the Tm range.
          min_tm_low_dimer_panels = [ tm_amount_out_of_range_list[index] for index in chosen_set_index_list]
          min_tm_chosen_panel = min(min_tm_low_dimer_panels)
