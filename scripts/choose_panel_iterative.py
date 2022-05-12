@@ -4,6 +4,7 @@ import os
 from argparse import ArgumentParser
 import json
 from Bio import SeqIO, Seq, SeqRecord
+from Bio.SeqUtils import GC
 import multiprocessing as mp
 from numpy.random import choice
 import csv
@@ -716,7 +717,7 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
         writer = csv.writer(handle, delimiter = ',')
         header = ['Genomic_locus', 'CpG_id', 'Probe_sequence', 'Upstream_arm_sequence', 'Backbone_sequence', 'Downstream_arm_sequence', 
                     'Genomic_locus_upstream_arm', 'Genomic_locus_downstream_arm', 'Target_length', 'Target_strand', 'Delta_Tm',
-                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score']
+                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score', 'upstream_cg_percentage', 'downstream_cg_percentage']
         writer.writerow(header)
         for i,probe in enumerate(chosen_set):
             if probe == None:
@@ -744,9 +745,11 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                 snp_conflict = snp_conflicts[i][probe_id]  # 14 Amount of frequent SNPs in arms
                 hairpin_score = hairpin_scores[i][probe_id]  # 15 Hairpin score of probe
                 dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
+                upstream_cg_percentage = GC(upstream_sequence)
+                downstream_cg_percentage = GC(downstream_sequence)
                 row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus,
                         downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict,
-                        hairpin_score, dimer_score]
+                        hairpin_score, dimer_score, upstream_cg_percentage, downstream_cg_percentage]
                 writer.writerow(row)
 
 if __name__ == '__main__':
