@@ -21,10 +21,9 @@ def main():
     config_file = args["config_file"]
     nr_of_cores = int(args["cores"])
     acc_nr_to_chrom_nr_file = args["acc_nr_to_chrom_nr_file"]
-
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
         target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
-        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe = import_config(config_file)  # Import parameters set in configuration file
+        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe , conversion = import_config(config_file)  # Import parameters set in configuration file
 
     start = time.time()
     cpg_id_list = create_cpg_id_list(bed_file)  # Obtain CpG list from target bed_file
@@ -35,7 +34,7 @@ def main():
                                                                              max_target_length, min_arm_length, 
                                                                              max_arm_length, min_target_length, 
                                                                              max_cg_percentage, cpg_flanks, mid_loc, 
-                                                                             cpg_id_list[i],max_cpgs_in_arms)) for i, record in
+                                                                             cpg_id_list[i], max_cpgs_in_arms, conversion)) for i, record in
                                                      enumerate(SeqIO.parse(handle, "fasta"))]  
             # Create all possible arms taking into account the parameters set in the configuration file
     end = time.time()
@@ -138,6 +137,7 @@ def import_config(config_file):  # import config file
     min_cg_percentage = float(probe_specifics['min_cg_percentage'])
     max_cpgs_in_arms = int(probe_specifics["max_cpgs_in_arms"])
     max_delta_tm_probe = float(probe_specifics["max_delta_tm_probe"])
+    conversion = probe_specifics["conversion"]
 
     # patch backbone together
     backbone = config_object['backbone_sequence'][0]
@@ -155,7 +155,7 @@ def import_config(config_file):  # import config file
 
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe
+        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe, conversion
 
 
 def create_cpg_id_list(bed_file):
@@ -166,9 +166,12 @@ def create_cpg_id_list(bed_file):
             cpg_id_list.append(row[3])
     return cpg_id_list
 
+def C_to_T_convert(probe_arm):
+    adjusted_probe_arm = probe_arm.replace('G','A')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A.
+    return adjusted_probe_arm
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
-                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id, max_cpgs_in_arms):
+                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id, max_cpgs_in_arms, conversion):
     # Obtain the list of possible arm combinations for one record (target CpG in the Fasta file).
     # Each nested value is a list containing the following information:
         # 0 [Sequence Upstream arm
@@ -192,6 +195,10 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
             for start_loc in range(start_loc_downstream, end_loc_downstream):
                 start_loc_upstream = start_loc + target_length
                 new_d_arm = record.seq[start_loc - arm_length_downstream:start_loc]
+                if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                    new_d_arm = C_to_T_convert(new_d_arm)
+                else:
+                    pass
                 if GC(new_d_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
                     break
                 else:
@@ -201,6 +208,10 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                     int(record.id.split(':')[1].split("-")[0]) + start_loc - 1)
                 for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
                     new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
+                    if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                        new_u_arm = C_to_T_convert(new_u_arm)
+                    else:
+                        pass
                     if GC(new_u_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
                         break
                     elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
@@ -219,12 +230,20 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
             for start_loc in range(start_loc_downstream, end_loc_downstream):
                 start_loc_upstream = start_loc + target_length
                 new_d_arm_rev = rev_record.seq[start_loc - arm_length_downstream:start_loc]
+                if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                    new_d_arm_rev = C_to_T_convert(new_d_arm_rev)
+                else:
+                    pass
                 if GC(new_d_arm_rev) > max_cg_percentage or GC(new_d_arm_rev) < min_cg_percentage:
                     break
                 else:
                     pass
                 for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
                     new_u_arm_rev = rev_record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
+                    if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                        new_u_arm_rev = C_to_T_convert(new_u_arm_rev)
+                    else:
+                        pass
                     if GC(new_u_arm_rev) > max_cg_percentage or GC(new_u_arm_rev) < min_cg_percentage:
                         break
                     elif new_d_arm_rev.count('CG') + new_u_arm_rev.count('CG') > max_cpgs_in_arms:

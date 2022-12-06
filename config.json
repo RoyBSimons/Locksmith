@@ -29,7 +29,8 @@
 		    "cpg_flanks": 0,
 		    "max_cpgs_in_arms": 0,
 		    "max_delta_tm_probe": 5,
-		    "max_delta_tm_panel": 5
+		    "max_delta_tm_panel": 5,
+		    "conversion": "bisulfite"
 	    }
 	],
     "mfeprimer_hairpin_parameters": [

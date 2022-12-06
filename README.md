@@ -215,6 +215,7 @@ The configuration file which is needed to run Locksmith includes all initial par
 - "max_cg_percentage": Maximum CG percentage of the probe arms.
 - "cpg_flanks": Amount of basepairs which must be flanking the target locus on both sides before annealing sites for the probe arms.
 - "max_cpgs_in_arms": Maximum combined amount of CpGs in the probe arms which will be tolerated during probe design.
+- "conversion": When "bisulfite", probes will be designed to target bisulfite converted gDNA, otherwise targeting gDNA.
 
 "mfeprimer_hairpin_parameters": Parameters to use for hairpin check.
 - "score_cutoff": Hairpin score threshold for reporting hairpins.
