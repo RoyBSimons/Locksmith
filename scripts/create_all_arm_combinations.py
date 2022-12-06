@@ -32,7 +32,7 @@ def main():
             possible_arm_combinations_all_targets = [pool_handle.apply(create_all_possible_arms_both_strands, 
                                                                        args=(record, min_target_length, 
                                                                              max_target_length, min_arm_length, 
-                                                                             max_arm_length, min_target_length, 
+                                                                             max_arm_length, min_cg_percentage, 
                                                                              max_cg_percentage, cpg_flanks, mid_loc, 
                                                                              cpg_id_list[i], max_cpgs_in_arms, conversion)) for i, record in
                                                      enumerate(SeqIO.parse(handle, "fasta"))]  
