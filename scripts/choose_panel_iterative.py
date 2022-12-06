@@ -621,7 +621,7 @@ def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, pro
     weight_tm = int(scoring_weights['tm'])
     
     # Find amount of chosen probes that have a Tm outside of the Tm range around the median Tm.
-    tm_amount_out_of_range = sum(tm_list > upperbound_tm) + sum(tm_list < lowerbound_tm)
+    tm_amount_out_of_range = sum([tm for tm in tm_list if tm > upperbound_tm]) + sum([tm for tm in tm_list if tm  < lowerbound_tm])
 
     # Find all probes that have a Tm outside of the Tm range around the median Tm.
     # Add the following amount to the score: scoring weight Tm * difference between probe Tm and median Tm.
