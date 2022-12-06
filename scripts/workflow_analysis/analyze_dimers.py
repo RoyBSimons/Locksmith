@@ -22,10 +22,16 @@ with open(input_name) as handle:
         Tm=row['Tm']
         probe=row['S1']['ID']
         Tm_list.append(Tm)
+        probe2=row['S2']['ID']
         if probe in probe_list:
             probe_list_count[probe_list.index(probe)]+=1
         else:
             probe_list.append(probe)
+            probe_list_count.append(1)
+        if probe2 in probe_list:
+            probe_list_count[probe_list.index(probe2)]+=1
+        else:
+            probe_list.append(probe2)
             probe_list_count.append(1)
 matplotlib.use('Agg')
 plt.hist(Tm_list)
@@ -33,6 +39,7 @@ plt.xlabel('Tm (C)')
 plt.ylabel('Occurence')
 plt.savefig(output_name+'.png')
 nr_of_times=max(probe_list_count)
+print('Total amount of dimer forming probes is ',len(probe_list))
 sorted_nr_list=[]
 sorted_probe_list=[]
 while nr_of_times >0:
