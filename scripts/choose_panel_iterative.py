@@ -160,6 +160,13 @@ def import_config(config_file):
     return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel
 
 
+def loadall(f):
+    while True:
+        try:
+            yield pickle.load(f)
+        except EOFError:
+            break
+
 def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, probe_arms_file):
     # Import the probe parameters from each of the separate files created by the Create_probes rule
     # All 2D array are a object dtype as the amount of probes per CpG differ.
@@ -184,16 +191,16 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
     # Obtain 2D array containing the difference in Tm between the upstream and downstream arm of the padlock probe.
     # Each row consist of the delta-tms for all possible padlock probes to target one CpG.
     with open(tms_file, 'rb') as handle:
-        tms = pickle.load(handle)
-        tms = np.array(tms, dtype=object)
+        tms = loadall(handle)
+        tms = np.array([np.array(tms_array,dtype=object) for tms_array in tms],dtype=object)
     tms_up_file = tms_file[:-7]+'_up'+tms_file[-7:]
     with open(tms_up_file, 'rb') as handle:
-        tms_up = pickle.load(handle)
-        tms_up = np.array(tms_up, dtype=object)
+        tms_up = loadall(handle)
+        tms_up = np.array([np.array(tms_array,dtype=object) for tms_array in tms_up],dtype=object)
     tms_down_file = tms_file[:-7]+'_down'+tms_file[-7:]
     with open(tms_down_file, 'rb') as handle:
-        tms_down = pickle.load(handle)
-        tms_down = np.array(tms_down, dtype=object)
+        tms_down = loadall(handle)
+        tms_down = np.array([np.array(tms_array,dtype=object) for tms_array in tms_down],dtype=object)
     # Obtain a 2D array containing the amount of CpGs in the arms of the padlock probe.
     # Each row consist of the amount of CpGs in the arms for all possible padlock probes to target one CpG.
     with open(cpgs, 'r') as handle:
@@ -241,7 +248,8 @@ def import_probe_parameters(targets, probes, tms_file, cpgs, snps, hairpins, pro
         # 6 standedness
         # 7 CpG Id]
     with open(probe_arms_file, 'rb') as handle:
-        possible_arm_combinations_all_targets = pickle.load(handle)
+        possible_arm_combinations_all_targets = loadall(handle)
+        possible_arm_combinations_all_targets = np.array([np.array(possible_arm_combinations_one_target,dtype=object) for possible_arm_combinations_one_target in possible_arm_combinations_all_targets],dtype=object)
         probe_arm_list = []
         arm_upstream_loc_list = []
         arm_downstream_loc_list = []

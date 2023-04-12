@@ -29,6 +29,30 @@ rule extract_target_sequences:
 	shell:
 		"bedtools getfasta -fi {input.genome} -bed {input.bed}  -fo {output}"
 
+rule create_bed_chr_version:
+        input:
+                config_file = config['output_directory'] + "/config.json",
+		acc = config['acc_2_chrom_list_path'],
+                bed = config['output_directory'] + "/target_data/target_list_range.bed"
+        output:
+                bed_chr = config['output_directory'] + "/target_data/target_list_range_chrom_nrs.bed"
+
+	log:
+                out = config['output_directory'] + "/logs/create_bed_chr_stdout.log",
+                err = config['output_directory'] + "/logs/create_bed_chr_stderr.err"
+
+	shell:
+                "python {config[path_to_scripts]}create_bed_chr_version.py -b {input.bed} -a {input.acc} -o {output.bed_chr} 2> {log.err} 1> {log.out}"
+
+rule prepare_SNP_database:
+	input:
+		config_file = config['output_directory'] + "/config.json",
+		bed_chr = config['output_directory'] + "/target_data/target_list_range_chrom_nrs.bed"
+	output:
+		snp_database = config['output_directory'] + "/snp_database.tbi"
+	shell:
+		"if test -f snp_database.tbi; then cp snp_database.tbi {output.snp_database}; else tabix {config[ftp_path_snp_database]} -R {input.bed_chr} > {output.snp_database}; fi"
+
 #---------------------------------------------------------------------------------------------------
 #STEP 2: Create probes
 rule create_probes:
@@ -36,6 +60,7 @@ rule create_probes:
 		targets = config['output_directory'] + "/target_data/target_sequences.fa",
 		config_file = config['output_directory'] + "/config.json",
 		bed = config['output_directory'] + "/target_data/target_list_range.bed",
+		snp_db = config['output_directory'] + "/snp_database.tbi",
 		acc = config['acc_2_chrom_list_path']
 	output:
 		tms = config['output_directory'] + "/possible_probe_info/tms.pickle",
@@ -50,7 +75,7 @@ rule create_probes:
 		err = config['output_directory'] + "/logs/create_probes_stderr.err"
 
 	shell:
-		"python {config[path_to_scripts]}create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -a {input.acc} -t {config[max_threads]} 2> {log.err} 1> {log.out}"
+		"python {config[path_to_scripts]}create_all_arm_combinations.py -i {input.targets} -o {config[output_directory]} -c {input.config_file} -b {input.bed} -a {input.acc} -s {input.snp_db} -t {config[max_threads]} 2> {log.err} 1> {log.out}"
 #--------------------------------------------------------------------------------------------------
 #STEP 3: Choose panel
 rule choose_panel_iteratively:

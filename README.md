@@ -173,6 +173,12 @@ The Infinium annotation file can be obtained at e.g. https://zhouserver.research
 
 The Illumina cg identifier file is a headerless file with only the Illumina cg identifier for each target per row.
 
+-       snp_database.tbi
+
+The tabix indexed file is a TAB-delimited file which shows the frequent SNPs in the chosen target regions.
+This file will be created automatically when it is not yet present in the working directory to save running time.
+
+
 ### Configuration
 The configuration file which is needed to run Locksmith includes all initial parameters needed to create probes and select a probe panel.
 
