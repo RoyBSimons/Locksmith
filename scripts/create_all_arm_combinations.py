@@ -337,7 +337,6 @@ def obtain_snps(probe_list, freq_threshold, snp_db, acc_nr_to_chrom_nr_file):
     with open(snp_db) as input_file:
         input_reader = csv.reader(input_file,delimiter = '\t')
         for row in input_reader:
-            print(row)
             if "FREQ" in row[-1]:
                 freq_dbs = [freq_info for freq_info in row[-1].split(';') if 'FREQ' in freq_info][0].split('|')
                 for freq_db in freq_dbs:
