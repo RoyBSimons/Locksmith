@@ -24,7 +24,7 @@ def main():
     acc_nr_to_chrom_nr_file = args["acc_nr_to_chrom_nr_file"]
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
         target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
-        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe , conversion = import_config(config_file)  # Import parameters set in configuration file
+        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe , conversion = import_config(config_file)  # Import parameters set in configuration file
 
     final_start = time.time()
     start = time.time()
@@ -42,6 +42,16 @@ def main():
                                                                                  max_arm_length, min_cg_percentage,
                                                                                  max_cg_percentage, cpg_flanks, mid_loc,
                                                                                  cpg_id_list[i], max_cpgs_in_arms, conversion)
+            # Obtain a 2D array containing the amount of frequent SNPs in the arms of the padlock probe.
+            # Each row consist of the amount of SNPs in the arms for all possible padlock probes to target one CpG.
+            # Frequency threshold is set in configuration file
+            snp_conflicts = obtain_snps(possible_arm_combinations_one_target, freq_threshold, snp_db,
+                                        acc_nr_to_chrom_nr_file)
+            print('\tSNPs obtained')
+            # Remove probes with arms than contain more than the maximum allowed amount of SNPs
+            indices_list = [index for index,value in enumerate(snp_conflicts) if value <= max_snps_in_arms]
+            possible_arm_combinations_one_target = [value for index,value in enumerate(possible_arm_combinations_one_target) if index in indices_list]
+            snp_conflicts = [value for index,value in enumerate(snp_conflicts) if index in indices_list]
 
             tms, tms_up, tms_down = get_delta_tm_array(possible_arm_combinations_one_target)  
             #print(possible_arm_combinations_one_target[0])
@@ -62,12 +72,6 @@ def main():
             # Obtain a 2D array containing the hairpin information of all created padlock probes. 
             # Each row consist of an array of integers; a 0 when no hairpin is formed, a 1 when a hairpin is formed.
             print('\tHaipins obtained')
-            snp_conflicts = obtain_snps(possible_arm_combinations_one_target, freq_threshold, snp_db,
-                                        acc_nr_to_chrom_nr_file)
-            # Obtain a 2D array containing the amount of frequent SNPs in the arms of the padlock probe. 
-            # Each row consist of the amount of SNPs in the arms for all possible padlock probes to target one CpG. 
-            # Frequency threshold is set in configuration file
-            print('\tSNPs obtained')
 
             end = time.time()
             print('\t'+str(round(end-start,2)))
@@ -118,6 +122,7 @@ def import_config(config_file):  # import config file
     max_cg_percentage = float(probe_specifics['max_cg_percentage'])
     min_cg_percentage = float(probe_specifics['min_cg_percentage'])
     max_cpgs_in_arms = int(probe_specifics["max_cpgs_in_arms"])
+    max_snps_in_arms = int(probe_specifics["max_snps_in_arms"])
     max_delta_tm_probe = float(probe_specifics["max_delta_tm_probe"])
     conversion = probe_specifics["conversion"]
 
@@ -137,7 +142,7 @@ def import_config(config_file):  # import config file
 
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_delta_tm_probe, conversion
+        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe, conversion
 
 
 def create_cpg_id_list(bed_file):
