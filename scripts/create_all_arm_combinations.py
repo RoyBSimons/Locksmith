@@ -334,20 +334,35 @@ def obtain_snps(probe_list, freq_threshold, snp_db, acc_nr_to_chrom_nr_file):
     # obtain frequent SNPs in targets from snp_db file
     chr_list = []
     loc_list = []
-    freq_threshold = 1.0 - freq_threshold
     with open(snp_db) as input_file:
-        input_reader = csv.reader(input_file)
+        input_reader = csv.reader(input_file,delimiter = '\t')
         for row in input_reader:
-            if "FREQ" in row[0]:
-                freq = float(row[0].split(";")[-1].split(":")[-1])
-                if freq < freq_threshold:
-                    chrom = row[0].split('\t')[0]
-                    locus = int(row[0].split('\t')[1])
-                    if chrom in chr_list:
-                        loc_list[chr_list.index(chrom)].append(locus)
+            print(row)
+            if "FREQ" in row[-1]:
+                freq_dbs = [freq_info for freq_info in row[-1].split(';') if 'FREQ' in freq_info][0].split('|')
+                for freq_db in freq_dbs:
+                    if freq_db == 'COMMON':
+                        chrom = row[0]
+                        locus = int(row[1])
+                        if chrom in chr_list:
+                            loc_list[chr_list.index(chrom)].append(locus)
+                        else:
+                            chr_list.append(chrom)
+                            loc_list.append([locus])
                     else:
-                        chr_list.append(chrom)
-                        loc_list.append([locus])
+                        for freq in freq_db.split(':')[1].split(',')[1:]:
+                            if freq == '.':
+                                freq = 0.0
+                            else:
+                                freq = float(freq)
+                            if freq > freq_threshold:
+                                chrom = row[0]
+                                locus = int(row[1])
+                                if chrom in chr_list:
+                                    loc_list[chr_list.index(chrom)].append(locus)
+                                else:
+                                    chr_list.append(chrom)
+                                    loc_list.append([locus])
 
     #Find SNPs in probe arms, and return found amount
     chrom_nr_list, acc_nr_list = obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file)
