@@ -344,7 +344,10 @@ def obtain_snps(probe_list, freq_threshold, snp_db, acc_nr_to_chrom_nr_file):
                         chrom = row[0]
                         locus = int(row[1])
                         if chrom in chr_list:
-                            loc_list[chr_list.index(chrom)].append(locus)
+                            if locus in loc_list[chr_list.index(chrom)]:
+                                pass
+                            else:
+                                loc_list[chr_list.index(chrom)].append(locus)
                         else:
                             chr_list.append(chrom)
                             loc_list.append([locus])
@@ -358,7 +361,10 @@ def obtain_snps(probe_list, freq_threshold, snp_db, acc_nr_to_chrom_nr_file):
                                 chrom = row[0]
                                 locus = int(row[1])
                                 if chrom in chr_list:
-                                    loc_list[chr_list.index(chrom)].append(locus)
+                                    if locus in loc_list[chr_list.index(chrom)]:
+                                        pass
+                                    else:
+                                        loc_list[chr_list.index(chrom)].append(locus)
                                 else:
                                     chr_list.append(chrom)
                                     loc_list.append([locus])
