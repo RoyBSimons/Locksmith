@@ -51,6 +51,8 @@ def main():
             # Remove probes with arms than contain more than the maximum allowed amount of SNPs
             indices_list = [index for index,value in enumerate(snp_conflicts) if value <= max_snps_in_arms]
             possible_arm_combinations_one_target = [value for index,value in enumerate(possible_arm_combinations_one_target) if index in indices_list]
+            # Renumber remaining probes
+            possible_arm_combinations_one_target = [probe[0:4]+ [j]+probe[5:] for j,probe in enumerate(possible_arm_combinations_one_target)]
             snp_conflicts = [value for index,value in enumerate(snp_conflicts) if index in indices_list]
 
             tms, tms_up, tms_down = get_delta_tm_array(possible_arm_combinations_one_target)  
