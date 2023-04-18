@@ -31,7 +31,7 @@ def main():
     panel_output_file = args['panel_output_file']
 
     permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, \
-            scoring_weights, max_delta_tm_panel = import_config(config_file)  # Import parameters from configuration file.
+            scoring_weights, max_delta_tm_panel, UMI_length = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
@@ -107,7 +107,7 @@ def main():
 
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
                 panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
-                hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down)  # Write the output to a file.
+                hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length)  # Write the output to a file.
     os.system('rm ' + outputdir + '/possible_probe_info/combined.bed')
 
 def get_arg_parser():
@@ -157,7 +157,8 @@ def import_config(config_file):
     tm_cutoff = int(config_object['mfeprimer_dimer_parameters'][0]['tm_cutoff'])
     scoring_weights = config_object['scoring_weights'][0]
     max_delta_tm_panel = int(config_object["probe_specifics"][0]["max_delta_tm_panel"])
-    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel
+    UMI_length = int(config_object["backbone_sequence"][0]["UMI_length"])
+    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel, UMI_length
 
 
 def loadall(f):
@@ -687,7 +688,7 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores):
     return dimer_scores
 
 
-def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers, panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down):
+def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers, panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length):
     # Write the output of the Choose_probes rule.
         # 1. Fasta file with chosen panel
         # 2. Tab delimiter file with conflicting probes per iteration
@@ -710,7 +711,9 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
             else:
                 probename = str(i)
                 probe_description = description_list[i]
-                seq_list.append(SeqRecord.SeqRecord(Seq.Seq(probe[0]), id=probename, description=probe_description))
+                probe_id=int(probe[1].split(':')[-1])
+                probe_seq = Seq.Seq(probe_arm_list[i][probe_id][0]+ UMI_length*'N'+ backbone_sequence + probe_arm_list[i][probe_id][1])
+                seq_list.append(SeqRecord.SeqRecord(probe_seq,id=probename, description=probe_description))
                 # probe[1]))
         SeqIO.write(seq_list, handle, 'fasta')
 
@@ -739,7 +742,7 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                 probe_id=int(probe[1].split(':')[-1])
                 locus = description_list[i].split('\t')[0]  # 0 Genomic locus
                 cpg_id = description_list[i].split('\t')[1]  # 1 CpG id
-                probe_sequence = probe[0]  # 2 sequence
+                probe_sequence = probe_arm_list[i][probe_id][0]+ UMI_length*'N'+ backbone_sequence + probe_arm_list[i][probe_id][1]# 2 sequence
                 upstream_sequence = probe_arm_list[i][probe_id][0]  # 3 Upstream arm sequence
                 backbone_sequence = backbone_sequence  # 4 Backbone sequence
                 downstream_sequence = probe_arm_list[i][probe_id][1]  # 5 Downstream arm sequence

@@ -13,6 +13,7 @@
     "seed" : "11",
     "backbone_sequence" : [
 	    {
+                    "UMI_length":"9",
 		    "reverse_complement_universal_forward_primer": "CTTAGGCTGGATCTTCTCCC",
 		    "common_region": "GCGAATTTTA",
 		    "universal_reverse_primer": "ACCCTCACCAACTAGGAGAT"
