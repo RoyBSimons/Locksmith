@@ -103,7 +103,7 @@ def main():
     print('\tMinimal number of dimers is ' + str(min_dimers))
     print('\tAmount of annealing sites outside of Tm range is ' + str(min_tm_chosen_panel))
 
-    dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores)
+    dimer_scores = get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores, outputdir)
 
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
                 panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
@@ -642,10 +642,10 @@ def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, pro
     new_probe_costs = np.add(probe_costs, total_increase)
     return new_probe_costs, tm_amount_out_of_range
 
-def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores):
+def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores, outputdir):
     # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
-    with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
+    with open(outputdir + 'tmp_fasta_chosen_probes.fasta', 'w') as handle:
         for i, probe in enumerate(chosen_set):
             if probe is None:
                 passed_list.append(i)
@@ -655,12 +655,12 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores):
 
     # Test the chosen probes set for dimers
     os.system(
-        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
+        'mfeprimer dimer -i ' + outputdir + 'tmp_fasta_chosen_probes.fasta -j -o ' + outputdir + 'tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
     # Score cut-off and temperature cut-off are set in configuration file
 
     # Obtain dimer list from mfeprimer output
-    os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
-    dimer_file = 'tmp_dimers_chosen_probes.json'
+    os.system('rm ' + outputdir + 'tmp_fasta_chosen_probes.fasta ' + outputdir + 'tmp_dimers_chosen_probes')
+    dimer_file = outputdir + 'tmp_dimers_chosen_probes.json'
     with open(dimer_file) as jsonFile:
         dimerlist = json.load(jsonFile)
         jsonFile.close()
