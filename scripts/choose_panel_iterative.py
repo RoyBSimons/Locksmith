@@ -463,7 +463,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
                                                   existing_probes):
     # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
-    with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
+    with open(outputdir + 'tmp_fasta_chosen_probes.fasta', 'w') as handle:
         for i, probe in enumerate(chosen_probes):
             if probe is None:
                 passed_list.append(i)
@@ -478,12 +478,12 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
 
     # Test the chosen probes set for dimers
     os.system(
-        'mfeprimer dimer -i tmp_fasta_chosen_probes.fasta -j -o tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
+        'mfeprimer dimer -i ' + outputdir + 'tmp_fasta_chosen_probes.fasta -j -o ' + outputdir + 'tmp_dimers_chosen_probes -s '+str(score_cutoff)+' -t '+str(tm_cutoff) + ' -c ' + str(nr_of_cores))
     # Score cut-off and temperature cut-off are set in configuration file
 
     # Obtain dimer list from mfeprimer output
-    os.system('rm tmp_fasta_chosen_probes.fasta tmp_dimers_chosen_probes')
-    dimer_file = 'tmp_dimers_chosen_probes.json'
+    os.system('rm ' + outputdir + 'tmp_fasta_chosen_probes.fasta ' + outputdir + 'tmp_dimers_chosen_probes')
+    dimer_file = outputdir + 'tmp_dimers_chosen_probes.json'
     with open(dimer_file) as jsonFile:
         dimerlist = json.load(jsonFile)
         jsonFile.close()
