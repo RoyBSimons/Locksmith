@@ -31,7 +31,7 @@ def main():
     panel_output_file = args['panel_output_file']
 
     permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, \
-            scoring_weights, max_delta_tm_panel, UMI_length = import_config(config_file)  # Import parameters from configuration file.
+            scoring_weights, max_delta_tm_panel, UMI_length, existing_panel_csv_path = import_config(config_file)  # Import parameters from configuration file.
 
     probe_cpg_id_list, possible_probes_all_targets, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_arm_list, \
         arm_upstream_loc_list, arm_downstream_loc_list, probe_id_list, arm_upstream_list, arm_downstream_list, \
@@ -55,6 +55,20 @@ def main():
     # This file is used for the create_conflicting_indices_list_bedtools function inside the increase_costs_dimer_forming_probes_iterative function.
     loci_bedfile_name = outputdir + 'possible_probe_info/combined.bed'
     write_nested_loci_to_bedfile(loci_bedfile_name, arm_upstream_loc_list, arm_downstream_loc_list, probe_arm_list)
+    # import existing probes to use in dimerization check and Tm optimization.
+    if existing_panel_csv_path != 'False':
+        existing_probes = list()
+        existing_probes_tm = list()
+        with open(existing_panel_csv_path,'r') as handle:
+            reader = csv.reader(handle, delimiter = ',')
+            next(reader,None)
+            for row in reader:
+                existing_probes.append(row)
+                existing_probes_tm.append(float(row[11]))
+                existing_probes_tm.append(float(row[12]))
+    else:
+        existing_probes = []
+        existing_probes_tm = []
 
     #Loop to choose probes and rescore dimer-forming probes untill the maximum amount of iterations is encountered or there are no dimer-forming probes in the panel.
     while counter < permutations and (min_dimers > 0 or tm_amount_out_of_range > 0):
@@ -75,12 +89,13 @@ def main():
                                                           chosen_probes, probe_costs, probe_cpg_id_list, 
                                                           probe_id_list, arm_upstream_list, arm_downstream_list, 
                                                           arm_upstream_loc_list, arm_downstream_loc_list, 
-                                                          exclusion_factor, outputdir, score_cutoff, tm_cutoff, nr_of_cores)
+                                                          exclusion_factor, outputdir, score_cutoff, tm_cutoff,
+                                                          nr_of_cores, existing_probes)
 
         # Increase cost of all probes (also not-chosen probes) that do not fall into the panel Tm range.
         # Tm is out of bounds when it is outside of: median Tm + or - half of the Tm range threshold.
         probe_costs, tm_amount_out_of_range = increase_cost_probes_with_out_of_bounds_tm(chosen_probes,
-                probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel)
+                probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel, existing_probes_tm)
         tm_amount_out_of_range_list.append(tm_amount_out_of_range)
         nr_of_dimer_probes = len(cpgs_of_dimer_forming_probes)
         probes_with_dimers_lists.append(nr_of_dimer_probes)
@@ -107,7 +122,7 @@ def main():
 
     write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers,
                 panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts,
-                hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length)  # Write the output to a file.
+                hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length, existing_probes)  # Write the output to a file.
     os.system('rm ' + outputdir + '/possible_probe_info/combined.bed')
 
 def get_arg_parser():
@@ -158,7 +173,8 @@ def import_config(config_file):
     scoring_weights = config_object['scoring_weights'][0]
     max_delta_tm_panel = int(config_object["probe_specifics"][0]["max_delta_tm_panel"])
     UMI_length = int(config_object["backbone_sequence"][0]["UMI_length"])
-    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel, UMI_length
+    existing_panel_csv_path = config_object['existing_panel_csv_path']
+    return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel, UMI_length, existing_panel_csv_path
 
 
 def loadall(f):
@@ -443,7 +459,8 @@ def create_conflicting_indices_list_bedtools(dimer_range_list, dimer_bedfile_nam
 def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_targets, chosen_probes, probe_costs,
                                                   probe_cpg_id_list, probe_id_list, arm_upstream_list,
                                                   arm_downstream_list, arm_upstream_loc_list, arm_downstream_loc_list,
-                                                  exclusion_factor, outputdir, score_cutoff, tm_cutoff, nr_of_cores):
+                                                  exclusion_factor, outputdir, score_cutoff, tm_cutoff, nr_of_cores,
+                                                  existing_probes):
     # Create a fasta file with the chosen probes in this iteration.
     passed_list = []
     with open('tmp_fasta_chosen_probes.fasta', 'w') as handle:
@@ -453,6 +470,11 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
             else:
                 handle.write('>' + probe[1] + '\n')
                 handle.write(probe[0] + '\n')
+        existing_probe_cpg_list = []
+        for i, probe in enumerate(existing_probes):
+            handle.write('>' + probe[1] + '\n')
+            handle.write(probe[2].replace('N','') + '\n') #remove N for mfeprimer dimer
+            existing_probe_cpg_list.append(probe[1])
 
     # Test the chosen probes set for dimers
     os.system(
@@ -610,7 +632,7 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
         probe_costs[i][j] = probe_costs[i][j] + float(10 ** 10)  # Increase cost of conflicting probe
     return all_conflicting_probe_list, conflicting_targets, probe_costs, cpgs_of_dimer_forming_probes
 
-def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel):
+def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel, existing_probes_tm):
     # Get indices of chosen_probes
     indices=[]
     for i,probe in enumerate(chosen_probes):
@@ -624,7 +646,8 @@ def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, pro
     tm_up_list = [tms_up[index[0]][index[1]] for index in indices]
     tm_down_list = [tms_down[index[0]][index[1]] for index in indices]
     tm_list = tm_up_list + tm_down_list
-    median_tm = statistics.median(tm_list)
+    # Take into account Tm of existing probes if adding probes to a panel.
+    median_tm = statistics.median(tm_list + existing_probes_tm)
     upperbound_tm = median_tm + 0.5 * max_delta_tm_panel  # Set upper Tm limit.
     lowerbound_tm = median_tm - 0.5 * max_delta_tm_panel  # Set lower Tm limit.
     weight_tm = int(scoring_weights['tm'])
@@ -688,7 +711,7 @@ def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores):
     return dimer_scores
 
 
-def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers, panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length):
+def write_output(targets, output_name, chosen_set, conflicting_file, conflicting_probe_list, min_dimers, panel_output_file, probe_arm_list, backbone_sequence, tms, cpg_conflicts, snp_conflicts, hairpin_scores, probe_id_list, dimer_scores, tms_up, tms_down, UMI_length, existing_probes):
     # Write the output of the Choose_probes rule.
         # 1. Fasta file with chosen panel
         # 2. Tab delimiter file with conflicting probes per iteration
@@ -701,20 +724,27 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
         for row in reader:
             loc=int((int(row[1])+int(row[2])-1)/2)  #Obtain middle value from target bed file. Middle value is the location of the CpG.
             description_list.append(str(row[0] + ':' + str(loc)  + '\t' + row[-1]))  # Genomic locus \t nr of chosen probe for CpG
+    existing_description_list=[]
+    for probe in existing_probes:
+        existing_description_list.append(str(probe[0]) + '\t' +  str(probe[1]))
 
     # Choose panel with the least amount of dimers.
     # Write probes of chosen panel to a fasta file.
     with open(output_name, 'w') as handle:
+        for j, probe in enumerate(existing_probes):
+            probename = str(j)
+            probe_description = existing_description_list[j]
+            probe_seq = Seq.Seq(probe[2])
+            seq_list.append(SeqRecord.SeqRecord(probe_seq, id = probename, description = probe_description))
         for i, probe in enumerate(chosen_set):
             if probe is None:
                 pass
             else:
-                probename = str(i)
+                probename = str(i + len(existing_probes))
                 probe_description = description_list[i]
-                probe_id=int(probe[1].split(':')[-1])
+                probe_id = int(probe[1].split(':')[-1])
                 probe_seq = Seq.Seq(probe_arm_list[i][probe_id][0]+ UMI_length*'N'+ backbone_sequence + probe_arm_list[i][probe_id][1])
-                seq_list.append(SeqRecord.SeqRecord(probe_seq,id=probename, description=probe_description))
-                # probe[1]))
+                seq_list.append(SeqRecord.SeqRecord(probe_seq, id = probename, description = probe_description))
         SeqIO.write(seq_list, handle, 'fasta')
 
     # Return conflicting probes per iteration to a file.
@@ -724,13 +754,17 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
             writer.writerow(row)
 
     
-    # Return tab separated file with information about probe panel
+    # Return comma separated file with information about probe panel
     with open(panel_output_file, 'w') as handle:
         writer = csv.writer(handle, delimiter = ',')
         header = ['Genomic_locus', 'CpG_id', 'Probe_sequence', 'Upstream_arm_sequence', 'Backbone_sequence', 'Downstream_arm_sequence', 
                     'Genomic_locus_upstream_arm', 'Genomic_locus_downstream_arm', 'Target_length', 'Target_strand', 'Delta_Tm',
-                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score', 'upstream_cg_percentage', 'downstream_cg_percentage']
+                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score', 'upstream_cg_percentage', 'downstream_cg_percentage','Panel_id']
         writer.writerow(header)
+        max_panel_id = 0
+        for j, probe in enumerate(existing_probes):
+            max_panel_id = max(int(probe[-1]),max_panel_id)
+            writer.writerow(probe)
         for i,probe in enumerate(chosen_set):
             if probe == None:
                 locus = description_list[i].split('\t')[0]  # 0 Genomic locus
@@ -759,9 +793,10 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                 dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
                 upstream_cg_percentage = GC(upstream_sequence)
                 downstream_cg_percentage = GC(downstream_sequence)
+                panel_id = max_panel_id + 1
                 row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus,
                         downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict,
-                        hairpin_score, dimer_score, upstream_cg_percentage, downstream_cg_percentage]
+                        hairpin_score, dimer_score, upstream_cg_percentage, downstream_cg_percentage, panel_id]
                 writer.writerow(row)
 
 if __name__ == '__main__':
