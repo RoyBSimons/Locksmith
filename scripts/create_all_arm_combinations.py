@@ -201,7 +201,7 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                         new_u_arm = C_to_T_convert(new_u_arm)
                     else:
                         pass
-                    if GC(new_u_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
+                    if GC(new_u_arm) > max_cg_percentage or GC(new_u_arm) < min_cg_percentage:
                         break
                     elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
                         break
