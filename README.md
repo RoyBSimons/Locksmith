@@ -242,3 +242,5 @@ Formula: Hairpin_score * hairpin_weight + nr_of_cpgs_in_arms * cpg_weight + nr_o
 "permutations": Maximum amount of iterations to be performed before choosing the panel with the least amount of dimers.
 
 "max_threads": Maximum amount of threads that will be used by Locksmith
+
+"existing_panel_csv_path": Path to chosen_panel.csv file when using an existing Locksmith panel to add probes to. (Default: False)

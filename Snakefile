@@ -1,4 +1,10 @@
 configfile:	config['path_to_config_file']
+existing_probes_file = list()
+if config['existing_panel_csv_path'] == 'False':
+        pass
+else:
+        existing_probes_file.append(config['existing_panel_csv_path'])
+
 rule all:
 	input:
 		fasta = config['output_directory'] + "/chosen_panel_iterative.fasta"
@@ -14,11 +20,12 @@ rule copy_config_to_output_directory:
 rule create_bed_file_range:
 	input:
 		target = config['target_list_bedfile_path'],
-		c = config['output_directory'] + "/config.json"
+		c = config['output_directory'] + "/config.json",
+		existing_probes_file = existing_probes_file
 	output:
 		config['output_directory'] + "/target_data/target_list_range.bed"
 	shell:
-		"python {config[path_to_scripts]}target_2_target_range_list.py -f {input.target} -o {output} -r {config[target_range]}"
+		"python {config[path_to_scripts]}target_2_target_range_list.py -f {input.target} -o {output} -r {config[target_range]} -p {config[existing_panel_csv_path]}"
 
 rule extract_target_sequences:
 	input:
@@ -87,7 +94,8 @@ rule choose_panel_iteratively:
                 hairpins = config['output_directory'] + "/possible_probe_info/hairpin_scores.csv",
                 snp = config['output_directory'] + "/possible_probe_info/snp_conflicts.csv",
 		arms = config['output_directory'] + "/possible_probe_info/probe_arms.pickle",
-                target = config['output_directory'] + "/target_data/target_list_range.bed"
+                target = config['output_directory'] + "/target_data/target_list_range.bed",
+		existing_probes_file = existing_probes_file
 
 	output:
                 fasta = config['output_directory'] + "/chosen_panel_iterative.fasta",
