@@ -60,6 +60,7 @@
     "existing_panel_csv_path" : "False",
     "specificity_specifics" : [
 	    {
+		    "Perform_specificity_check": "False",
 		    "tile_size" : 6,
 		    "min_match" : 1,
 		    "min_score" : 10
