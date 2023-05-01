@@ -72,6 +72,56 @@ Export the executable to PATH
 ```
 export PATH=<Path to tabix executable>:$PATH
 ```
+
+- [BLAT](https://users.soe.ucsc.edu/~kent/src/)
+
+Download libpng
+```
+wget http://downloads.sourceforge.net/project/libpng/libpng16/older-releases/1.6.2/libpng-1.6.2.tar.gz
+```
+Untar the libpng file
+```
+tar xvzf libpng-1.6.2.tar.gz
+```
+Change working directory
+```
+cd libpng-1.6.2/
+```
+Install libpng
+```
+./configure --prefix=`pwd`
+```
+```
+make
+make install
+```
+Define the location of the libpng directory
+```
+LIBPNGDIR=`pwd`
+```
+Download BLAT
+```
+cd ../
+wget http://users.soe.ucsc.edu/~kent/src/blatSrc35.zip
+unzip blatSrc35.zip
+cd blatSrc/
+```
+Copy needed libpng files into BLAT directory
+```
+cp $LIBPNGDIR/png.h lib/
+cp $LIBPNGDIR/pngconf.h lib/
+cp $LIBPNGDIR/pnglibconf.h lib/
+```
+Install BLAT
+```
+make
+```
+```
+Export the executable to PATH
+```
+export PATH=<Path to BLAT executable>:$PATH
+```
+
 ### Set up conda environment
 - Download [Conda](https://www.anaconda.com/products/individual) with Python 3.9
 

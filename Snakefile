@@ -4,10 +4,15 @@ if config['existing_panel_csv_path'] == 'False':
         pass
 else:
         existing_probes_file.append(config['existing_panel_csv_path'])
+if config['specificity_specifics'][0]['Perform_specificity_check'] == 'False':
+	rule all:
+		input:
+			panel = config['output_directory'] + "/chosen_panel.csv"
+else:
+        rule all:
+                input:
+                        panel = config['output_directory'] + "/chosen_panel_specificity_check.csv"
 
-rule all:
-	input:
-		fasta = config['output_directory'] + "/chosen_panel_iterative.fasta"
 #---------------------------------------------------------------------------------------------------
 rule copy_config_to_output_directory:
 	input:
@@ -108,3 +113,19 @@ rule choose_panel_iteratively:
 
 	shell:
                 "python {config[path_to_scripts]}choose_panel_iterative.py -o {output.fasta} -c {input.config_file} -m {input.tms} -g {input.cpg} -p {input.probes} -a {input.hairpins} -n {input.snp} -r {input.target} -b {input.arms} -t {config[max_threads]} -u {config[output_directory]} -f {output.conflicts} -e {output.panel} 2> {log.err} 1> {log.out}"
+#--------------------------------------------------------------------------------------------------
+#STEP 4: Check specificity of Probes
+rule check_specificity:
+        input:
+                config_file = config['output_directory'] + "/config.json",
+		fasta = config['output_directory'] + "/chosen_panel_iterative.fasta",
+		genome = config['PATH_to_reference_genome_fasta']
+        output:
+                panel = config['output_directory'] + "/chosen_panel_specificity_check.csv"
+
+        log:
+                out = config['output_directory'] + "/logs/check_specificity_stdout.log",
+                err = config['output_directory'] + "/logs/check_specificity_stderr.err"
+
+        shell:
+                "python {config[path_to_scripts]}specificity_check.py -o {output.panel} -c {input.config_file} -g {input.genome} -p {input.fasta} 2> {log.err} 1> {log.out}"

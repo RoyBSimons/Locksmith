@@ -57,5 +57,12 @@
 	],
     "permutations": "1000",
     "max_threads": "10",
-    "existing_panel_csv_path" : "False"
+    "existing_panel_csv_path" : "False",
+    "specificity_specifics" : [
+	    {
+		    "tile_size" : 6,
+		    "min_match" : 1,
+		    "min_score" : 10
+	    }
+    ]
 }
