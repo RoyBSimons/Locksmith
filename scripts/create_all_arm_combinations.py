@@ -156,7 +156,7 @@ def create_cpg_id_list(bed_file):
     return cpg_id_list
 
 def C_to_T_convert(probe_arm):
-    adjusted_probe_arm = probe_arm.replace('G','A')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A.
+    adjusted_probe_arm = 'CGAACGCGGCGTTAC'.replace('CG','__').replace('G','A').replace('__','CG')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A, while keeping CGs intact.
     return adjusted_probe_arm
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
