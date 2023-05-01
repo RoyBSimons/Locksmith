@@ -173,7 +173,7 @@ def import_config(config_file):
     scoring_weights = config_object['scoring_weights'][0]
     max_delta_tm_panel = int(config_object["probe_specifics"][0]["max_delta_tm_panel"])
     UMI_length = int(config_object["backbone_sequence"][0]["UMI_length"])
-    existing_panel_csv_path = config_object['existing_panel_csv_path']
+    existing_panel_csv_path = config_object["existing_panel_csv_path"]
     return permutations, backbone_sequence, backbone_length, exclusion_factor, seed, score_cutoff, tm_cutoff, scoring_weights, max_delta_tm_panel, UMI_length, existing_panel_csv_path
 
 
