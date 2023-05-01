@@ -116,7 +116,6 @@ Install BLAT
 ```
 make
 ```
-```
 Export the executable to PATH
 ```
 export PATH=<Path to BLAT executable>:$PATH
