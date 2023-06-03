@@ -63,19 +63,22 @@ def main():
             reader = csv.reader(handle, delimiter = ',')
             next(reader,None)
             for row in reader:
-                existing_probes.append(row)
-                existing_probes_tm.append(float(row[11]))
-                existing_probes_tm.append(float(row[12]))
+                if len(row) > 2:  #if there is a probe in the panel for this locus
+                    existing_probes.append(row)
+                    existing_probes_tm.append(float(row[11]))
+                    existing_probes_tm.append(float(row[12]))
     else:
         existing_probes = []
         existing_probes_tm = []
-
+    median_tm = None
+    stable_boolean = True
+    conflicts_list = []
     #Loop to choose probes and rescore dimer-forming probes untill the maximum amount of iterations is encountered or there are no dimer-forming probes in the panel.
-    while counter < permutations and (min_dimers > 0 or tm_amount_out_of_range > 0):
+    while counter < permutations and stable_boolean  and (min_dimers > 0 or tm_amount_out_of_range > 0):
         # Choose probe set based on probability which is set by cost of a probe.
         chosen_probes = [choose_probes_from_costs(probe_costs[i], possible_arm_combinations,
                                                     permutations, counter, probe_id_list[i],
-                                                    seed)
+                                                    seed,tms_up[i], tms_down[i], median_tm)
                         for i, possible_arm_combinations in enumerate(possible_probes_all_targets)]
 
         print('\tRound ' + str(counter) + ' :Probes chosen')
@@ -94,7 +97,7 @@ def main():
 
         # Increase cost of all probes (also not-chosen probes) that do not fall into the panel Tm range.
         # Tm is out of bounds when it is outside of: median Tm + or - half of the Tm range threshold.
-        probe_costs, tm_amount_out_of_range = increase_cost_probes_with_out_of_bounds_tm(chosen_probes,
+        probe_costs, tm_amount_out_of_range, median_tm = increase_cost_probes_with_out_of_bounds_tm(chosen_probes,
                 probe_id_list, probe_costs, tms_down, tms_up, scoring_weights, max_delta_tm_panel, existing_probes_tm)
         tm_amount_out_of_range_list.append(tm_amount_out_of_range)
         nr_of_dimer_probes = len(cpgs_of_dimer_forming_probes)
@@ -103,8 +106,15 @@ def main():
         print('\t\t' + str(nr_of_dimer_probes) + ' out of ' + str(len(chosen_probes)) + ' probes form a dimer')
         print('\t\t' + str(tm_amount_out_of_range) + ' out of ' + str(len(chosen_probes)*2)+ ' annealing sites are outside the Tm range')
         min_dimers = min(nr_of_dimer_probes, min_dimers)  # Store the minimum number of dimers, to choose this panel after all iterations.
+        #Store conflicts per round
+        conflicts = (nr_of_dimer_probes, tm_amount_out_of_range)
+        conflicts_list.append(conflicts)
+        #If the conflicts are stable for 5 rounds in a row, stop the while loop
+        if counter > 5:
+            if len(set(conflicts_list[-5:])) == 1:
+                stable_boolean = False
         counter += 1
-
+        
     chosen_set_index_list = [ i for i,val in enumerate(probes_with_dimers_lists) if val == min_dimers ]  # Find index of panel with the least amount of dimers.
     if len(chosen_set_index_list) == 1:
         chosen_set_index = chosen_set_index_list[0]
@@ -305,10 +315,12 @@ def get_probe_costs_array(tms, cpg_conflicts, snp_conflicts, hairpin_array, scor
     return probe_cost
 
 
-def choose_probes_from_costs(probe_costs, possible_arm_combinations, n, counter, probe_id_list, seed):
+def choose_probes_from_costs(probe_costs, possible_arm_combinations, n, counter, probe_id_list, seed, tms_up, tms_down, median_tm):
     # Choose probes based on the current cost.
     # Cost changes each iteration
     np.random.seed(seed)  # Set seed from configuration file
+    #if probe_cost is nan, replace with high value: 10e100
+    probe_costs[np.isnan(probe_costs.astype(np.float64))] = np.float64(10e100)
     if probe_costs.size == 0:
         return
     else:
@@ -318,9 +330,26 @@ def choose_probes_from_costs(probe_costs, possible_arm_combinations, n, counter,
             probability_distribution = [1 / len(probe_scores)] * len(probe_scores)  # Create list of probabilities to choose probe
         else:
             probability_distribution = np.divide(probe_scores, sum_score)
-        probe = choice(possible_arm_combinations, n, p=probability_distribution)  # Choose probe based on probability list
-        index = possible_arm_combinations.index(probe[counter])
-    return [probe[counter], probe_id_list[index]]
+        if median_tm == None:
+            probe = choice(possible_arm_combinations, n, p=probability_distribution)  # Choose probe based on probability list
+            index = possible_arm_combinations.index(probe[counter])
+            chosen_probe = probe[counter]
+            probe_id =  probe_id_list[index]
+        else:
+            #choose 10 probes random-weighted and pick the probe with the lowest delta_tm from the Tm of the panel.
+            delta_tm_list = []
+            indices_list = []
+            for i in range(0,10):
+                probe = choice(possible_arm_combinations, n, p=probability_distribution)  # Choose probe based on probability list
+                index = possible_arm_combinations.index(probe[counter])
+                delta_tm_list.append(abs(median_tm - tms_up[index]) + abs(median_tm - tms_down[index]))
+                indices_list.append(index)
+            min_delta_tm = min(delta_tm_list)
+            index = indices_list[delta_tm_list.index(min_delta_tm)]
+            chosen_probe = possible_arm_combinations[index]
+            probe_id = probe_id_list[index]
+            probe = possible_arm_combinations[index]
+    return [chosen_probe, probe_id]
 
 
 def get_conflict_ranges(conflicting_cpg_list_dimer,conflict_range_dimer, exclusion_factor):
@@ -513,99 +542,113 @@ def increase_costs_dimer_forming_probes_iterative(possible_arm_combinations_all_
             dimer_end_num = dimer_start_num + len(dimer_structure)
             dimer_start_num2 = a_seq_dangling - s_2_dangling
             dimer_end_num2 = dimer_start_num2 + len(dimer_structure)
-            probe_index = probe_cpg_id_list.index(cpg_id.split(':')[0])
-            nested_index = probe_id_list[probe_index].index(cpg_id)
-            probe_index2 = probe_cpg_id_list.index(cpg_id2.split(':')[0])
-            nested_index2 = probe_id_list[probe_index2].index(cpg_id2)
+            try:
+                probe_index = probe_cpg_id_list.index(cpg_id.split(':')[0])
+                nested_index = probe_id_list[probe_index].index(cpg_id)
+            except ValueError: # in this case the probe forms a dimer with an existing probe Only report on the newly chosen probes.
+                probe_index = None
+                nested_index = None
+            try:
+                probe_index2 = probe_cpg_id_list.index(cpg_id2.split(':')[0])
+                nested_index2 = probe_id_list[probe_index2].index(cpg_id2)
+            except ValueError: # in this cas the probe forms a dimer with an existing probe. Only report on the newly chosen probes.
+                probe_index2 = None
+                nested_index2 = None
             # obtain the genomic locations of the dimer forming regions for S1
             # check whether the S1 sequence is 5' to 3' or the other way around.
-            if arm_upstream_list[probe_index][nested_index].strip("'") in dimer['S1']['Seq'][:len(
-                    arm_upstream_list[probe_index][nested_index].strip("'"))]:
-                # Check whether the dimer in in the upstream or downstream arm of the S1 probe
-                if dimer_start_num < len(
-                        arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
-                    dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
-                                                           probe_index, nested_index, dimer_start_num, dimer_end_num,
-                                                           dimer)
-                    conflict_range_dimer.append(dimer_range)
-                    conflicting_cpg_list_dimer.append(cpg_id)
-                elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
-                        "'")):  # dimer is in downstream arm.
-                    # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                    dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
-                                                             arm_downstream_loc_list, probe_index, nested_index,
-                                                             dimer_start_num, dimer_end_num, s1_length, dimer)
-                    conflict_range_dimer.append(dimer_range)
-                    conflicting_cpg_list_dimer.append(cpg_id)
-                else:  # dimer forming region is in backbone,
-                    # only report the other probe that forms the dimer together with this probe.
-                    pass
-            else:  # In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
-                dimer_start_num, dimer_end_num = s1_length - dimer_end_num, s1_length - dimer_start_num
-                # Check whether the dimer in in the upstream or downstream arm of the S1 probe
-                if dimer_start_num < len(
-                        arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
-                    dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
-                                                           probe_index, nested_index, dimer_start_num, dimer_end_num,
-                                                           dimer)
-                    conflict_range_dimer.append(dimer_range)
-                    conflicting_cpg_list_dimer.append(cpg_id)
-                elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
-                        "'")):  # dimer is in downstream arm
-                    # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                    dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
-                                                             arm_downstream_loc_list, probe_index, nested_index,
-                                                             dimer_start_num, dimer_end_num, s1_length, dimer)
-                    conflict_range_dimer.append(dimer_range)
-                    conflicting_cpg_list_dimer.append(cpg_id)
-                else:  # dimer forming region is in backbone,
-                    # only report the other probe that forms the dimer together with this probe.
-                    pass
+            if nested_index == None:
+                pass
+            else:
+                if arm_upstream_list[probe_index][nested_index].strip("'") in dimer['S1']['Seq'][:len(
+                        arm_upstream_list[probe_index][nested_index].strip("'"))]:
+                    # Check whether the dimer in in the upstream or downstream arm of the S1 probe
+                    if dimer_start_num < len(
+                            arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
+                        dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
+                                                               probe_index, nested_index, dimer_start_num, dimer_end_num,
+                                                               dimer)
+                        conflict_range_dimer.append(dimer_range)
+                        conflicting_cpg_list_dimer.append(cpg_id)
+                    elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
+                            "'")):  # dimer is in downstream arm.
+                        # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
+                                                                 arm_downstream_loc_list, probe_index, nested_index,
+                                                                 dimer_start_num, dimer_end_num, s1_length, dimer)
+                        conflict_range_dimer.append(dimer_range)
+                        conflicting_cpg_list_dimer.append(cpg_id)
+                    else:  # dimer forming region is in backbone,
+                        # only report the other probe that forms the dimer together with this probe.
+                        pass
+                else:  # In this situation the S1 sequence is 3'-5', therefore we need to correct the indices.
+                    dimer_start_num, dimer_end_num = s1_length - dimer_end_num, s1_length - dimer_start_num
+                    # Check whether the dimer in in the upstream or downstream arm of the S1 probe
+                    if dimer_start_num < len(
+                            arm_upstream_list[probe_index][nested_index].strip("'")):  # dimer is in upstream arm
+                        dimer_range = get_dimer_range_upstream(possible_arm_combinations_all_targets, arm_upstream_loc_list,
+                                                               probe_index, nested_index, dimer_start_num, dimer_end_num,
+                                                               dimer)
+                        conflict_range_dimer.append(dimer_range)
+                        conflicting_cpg_list_dimer.append(cpg_id)
+                    elif dimer_end_num >= s1_length - len(arm_downstream_list[probe_index][nested_index].strip(
+                            "'")):  # dimer is in downstream arm
+                        # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range = get_dimer_range_downstream(possible_arm_combinations_all_targets,
+                                                                 arm_downstream_loc_list, probe_index, nested_index,
+                                                                 dimer_start_num, dimer_end_num, s1_length, dimer)
+                        conflict_range_dimer.append(dimer_range)
+                        conflicting_cpg_list_dimer.append(cpg_id)
+                    else:  # dimer forming region is in backbone,
+                        # only report the other probe that forms the dimer together with this probe.
+                        pass
 
-            # obtain the genomic locations of the dimer forming regions for S2
-            # check whether the S2 sequence is 5' to 3' or the other way around.
-            if arm_upstream_list[probe_index2][nested_index2].strip("'") in dimer['S2']['Seq'][:len(
-                    arm_upstream_list[probe_index2][nested_index2].strip("'"))]:
-                # Check whether the dimer in in the upstream or downstream arm of the S2 probe
-                if dimer_start_num2 < len(
-                        arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
-                    dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
-                                                            arm_upstream_loc_list, probe_index2, nested_index2,
-                                                            dimer_start_num2, dimer_end_num2, dimer)
-                    conflict_range_dimer2.append(dimer_range2)
-                    conflicting_cpg_list_dimer2.append(cpg_id2)
-                elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
-                        "'")):  # dimer is in downstream arm.
-                    # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                    dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
-                                                              arm_downstream_loc_list, probe_index2, nested_index2,
-                                                              dimer_start_num2, dimer_end_num2, s2_length, dimer)
-                    conflict_range_dimer2.append(dimer_range2)
-                    conflicting_cpg_list_dimer2.append(cpg_id2)
-                else:  # dimer forming region is in backbone,
-                    # only report the other probe that forms the dimer together with this probe.
-                    pass
-            else:  # In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
-                dimer_start_num2, dimer_end_num2 = s2_length - dimer_end_num2, s2_length - dimer_start_num2
-                # Check whether the dimer in in the upstream or downstream arm of the S2 probe
-                if dimer_start_num2 < len(
-                        arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
-                    dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
-                                                            arm_upstream_loc_list, probe_index2, nested_index2,
-                                                            dimer_start_num2, dimer_end_num2, dimer)
-                    conflict_range_dimer2.append(dimer_range2)
-                    conflicting_cpg_list_dimer2.append(cpg_id2)
-                elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
-                        "'")):  # dimer is in downstream arm.
-                    # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
-                    dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
-                                                              arm_downstream_loc_list, probe_index2, nested_index2,
-                                                              dimer_start_num2, dimer_end_num2, s2_length, dimer)
-                    conflict_range_dimer2.append(dimer_range2)
-                    conflicting_cpg_list_dimer2.append(cpg_id2)
-                else:  # dimer forming region is in backbone,
-                    # only report the other probe that forms the dimer together with this probe.
-                    pass
+            if nested_index2 == None:
+                pass
+            else:
+                # obtain the genomic locations of the dimer forming regions for S2
+                # check whether the S2 sequence is 5' to 3' or the other way around.
+                if arm_upstream_list[probe_index2][nested_index2].strip("'") in dimer['S2']['Seq'][:len(
+                        arm_upstream_list[probe_index2][nested_index2].strip("'"))]:
+                    # Check whether the dimer in in the upstream or downstream arm of the S2 probe
+                    if dimer_start_num2 < len(
+                            arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
+                        dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
+                                                                arm_upstream_loc_list, probe_index2, nested_index2,
+                                                                dimer_start_num2, dimer_end_num2, dimer)
+                        conflict_range_dimer2.append(dimer_range2)
+                        conflicting_cpg_list_dimer2.append(cpg_id2)
+                    elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
+                            "'")):  # dimer is in downstream arm.
+                        # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
+                                                                  arm_downstream_loc_list, probe_index2, nested_index2,
+                                                                  dimer_start_num2, dimer_end_num2, s2_length, dimer)
+                        conflict_range_dimer2.append(dimer_range2)
+                        conflicting_cpg_list_dimer2.append(cpg_id2)
+                    else:  # dimer forming region is in backbone,
+                        # only report the other probe that forms the dimer together with this probe.
+                        pass
+                else:  # In this situation the S2 sequence is 3'-5', therefore we need to correct the indices.
+                    dimer_start_num2, dimer_end_num2 = s2_length - dimer_end_num2, s2_length - dimer_start_num2
+                    # Check whether the dimer in in the upstream or downstream arm of the S2 probe
+                    if dimer_start_num2 < len(
+                            arm_upstream_list[probe_index2][nested_index2].strip("'")):  # dimer is in upstream arm
+                        dimer_range2 = get_dimer_range_upstream(possible_arm_combinations_all_targets,
+                                                                arm_upstream_loc_list, probe_index2, nested_index2,
+                                                                dimer_start_num2, dimer_end_num2, dimer)
+                        conflict_range_dimer2.append(dimer_range2)
+                        conflicting_cpg_list_dimer2.append(cpg_id2)
+                    elif dimer_end_num2 >= s2_length - len(arm_downstream_list[probe_index2][nested_index2].strip(
+                            "'")):  # dimer is in downstream arm.
+                        # If dimer end has no overlap with the downsteam or upstream arm is should be in the backbone.
+                        dimer_range2 = get_dimer_range_downstream(possible_arm_combinations_all_targets,
+                                                                  arm_downstream_loc_list, probe_index2, nested_index2,
+                                                                  dimer_start_num2, dimer_end_num2, s2_length, dimer)
+                        conflict_range_dimer2.append(dimer_range2)
+                        conflicting_cpg_list_dimer2.append(cpg_id2)
+                    else:  # dimer forming region is in backbone,
+                        # only report the other probe that forms the dimer together with this probe.
+                        pass
 
     # Only report the probes that formed the most amount of dimers.
     # Exclusion factor determines the amount of conflicting probes that is selected. 1 = all, 0.1 = top 10%, etc.
@@ -663,7 +706,7 @@ def increase_cost_probes_with_out_of_bounds_tm(chosen_probes, probe_id_list, pro
     increase_4 = np.array([np.where(row > lowerbound_tm, row , np.multiply(np.abs(np.subtract(row,median_tm)),weight_tm)) for row in tms_up],dtype = object)
     total_increase = np.add(np.add(increase_1,increase_2),np.add(increase_3,increase_4))
     new_probe_costs = np.add(probe_costs, total_increase)
-    return new_probe_costs, tm_amount_out_of_range
+    return new_probe_costs, tm_amount_out_of_range, median_tm
 
 def get_dimer_scores(chosen_set, score_cutoff, tm_cutoff, targets, nr_of_cores, outputdir):
     # Create a fasta file with the chosen probes in this iteration.

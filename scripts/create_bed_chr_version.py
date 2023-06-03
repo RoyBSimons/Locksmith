@@ -12,7 +12,7 @@ def main():
     bed_path = args["bed_path"]
     output_file = args["output_file"]
     rewrite_bed_file_from_accession_nr_to_chromosome_nr(bed_path, acc_nr_to_chrom_nr_file, output_file)
-    print('happened')
+    print('Finished')
 
 def  obtain_acc_nr_and_chrom_nr_lists(acc_nr_to_chrom_nr_file):
     # This conversion is needed for couting the frequent SNPs in the probe arms.

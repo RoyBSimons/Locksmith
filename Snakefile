@@ -118,7 +118,7 @@ rule choose_panel_iteratively:
 rule check_specificity:
         input:
                 config_file = config['output_directory'] + "/config.json",
-		fasta = config['output_directory'] + "/chosen_panel_iterative.fasta",
+		csv = config['output_directory'] + "/chosen_panel.csv",
 		genome = config['PATH_to_reference_genome_fasta']
         output:
                 panel = config['output_directory'] + "/chosen_panel_specificity_check.csv"
@@ -128,4 +128,4 @@ rule check_specificity:
                 err = config['output_directory'] + "/logs/check_specificity_stderr.err"
 
         shell:
-                "python {config[path_to_scripts]}specificity_check.py -o {output.panel} -c {input.config_file} -g {input.genome} -p {input.fasta} 2> {log.err} 1> {log.out}"
+                "python {config[path_to_scripts]}specificity_check.py -o {output.panel} -c {input.config_file} -g {input.genome} -p {input.csv} 2> {log.err} 1> {log.out}"

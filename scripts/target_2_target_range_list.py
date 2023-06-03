@@ -26,7 +26,10 @@ else:
         reader = csv.reader(handle, delimiter = ',')
         next(reader, None)
         for row in reader:
-            existing_panel_cpg_id_list.append(row[1])
+            if len(row) > 2: #if there is a probe in the panel for this locus
+                existing_panel_cpg_id_list.append(row[1])
+            else:
+                pass
 
 outputlist=[]
 with open(filename) as inputfile:

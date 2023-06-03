@@ -156,7 +156,7 @@ def create_cpg_id_list(bed_file):
     return cpg_id_list
 
 def C_to_T_convert(probe_arm):
-    adjusted_probe_arm = 'CGAACGCGGCGTTAC'.replace('CG','__').replace('G','A').replace('__','CG')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A, while keeping CGs intact.
+    adjusted_probe_arm = probe_arm.replace('CG','__').replace('G','A').replace('__','CG')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A, while keeping CGs intact.
     return adjusted_probe_arm
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
@@ -189,28 +189,29 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                 else:
                     pass
                 if GC(new_d_arm) > max_cg_percentage or GC(new_d_arm) < min_cg_percentage:
-                    break
+                    pass
                 else:
                     pass
-                downstream_id = record.id.split(':')[0] + ":" + str(
-                    int(record.id.split(':')[1].split("-")[0]) + start_loc - arm_length_downstream) + "-" + str(
-                    int(record.id.split(':')[1].split("-")[0]) + start_loc - 1)
-                for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
-                    new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
-                    if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
-                        new_u_arm = C_to_T_convert(new_u_arm)
-                    else:
-                        pass
-                    if GC(new_u_arm) > max_cg_percentage or GC(new_u_arm) < min_cg_percentage:
-                        break
-                    elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
-                        break
-                    upstream_id = record.id.split(':')[0] + ":" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream) + "-" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream + arm_length_upstream - 1)
-                    probe = [str(new_u_arm), str(new_d_arm), upstream_id, downstream_id, i, target_length, '+', cpg_id]
-                    i += 1
-                    probe_list.append(probe)
+                    downstream_id = record.id.split(':')[0] + ":" + str(
+                        int(record.id.split(':')[1].split("-")[0]) + start_loc - arm_length_downstream) + "-" + str(
+                        int(record.id.split(':')[1].split("-")[0]) + start_loc - 1)
+                    for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
+                        new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
+                        if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                            new_u_arm = C_to_T_convert(new_u_arm)
+                        else:
+                            pass
+                        if GC(new_u_arm) > max_cg_percentage or GC(new_u_arm) < min_cg_percentage:
+                            pass
+                        elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
+                            pass
+                        else:
+                            upstream_id = record.id.split(':')[0] + ":" + str(
+                                int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream) + "-" + str(
+                                int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream + arm_length_upstream - 1)
+                            probe = [str(new_u_arm), str(new_d_arm), upstream_id, downstream_id, i, target_length, '+', cpg_id]
+                            i += 1
+                            probe_list.append(probe)
     for target_length in range(min_target_length,  # Find all arms from - strand
                                max_target_length + 1):  # loop over range of target lengths, including the maximum
         for arm_length_downstream in range(min_arm_length, max_arm_length + 1):
@@ -224,30 +225,30 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                 else:
                     pass
                 if GC(new_d_arm_rev) > max_cg_percentage or GC(new_d_arm_rev) < min_cg_percentage:
-                    break
-                else:
                     pass
-                for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
-                    new_u_arm_rev = rev_record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
-                    if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
-                        new_u_arm_rev = C_to_T_convert(new_u_arm_rev)
-                    else:
-                        pass
-                    if GC(new_u_arm_rev) > max_cg_percentage or GC(new_u_arm_rev) < min_cg_percentage:
-                        break
-                    elif new_d_arm_rev.count('CG') + new_u_arm_rev.count('CG') > max_cpgs_in_arms:
-                        break
-                    upstream_id_rev = record.id.split(':')[0] + ":" + str(int(record.id.split(':')[1].split("-")[0]) + (
-                                record_length - start_loc_upstream - arm_length_upstream)) + "-" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + (record_length - start_loc_upstream - 1))
-                    downstream_id_rev = record.id.split(':')[0] + ":" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + (record_length - start_loc)) + "-" + str(
-                        int(record.id.split(':')[1].split("-")[0]) + (
-                                    record_length - start_loc + arm_length_downstream - 1))
-                    probe = [str(new_u_arm_rev), str(new_d_arm_rev), upstream_id_rev, downstream_id_rev, i,
-                             target_length, '-', cpg_id]
-                    i += 1
-                    probe_list.append(probe)
+                else:
+                    for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
+                        new_u_arm_rev = rev_record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
+                        if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                            new_u_arm_rev = C_to_T_convert(new_u_arm_rev)
+                        else:
+                            pass
+                        if GC(new_u_arm_rev) > max_cg_percentage or GC(new_u_arm_rev) < min_cg_percentage:
+                            pass
+                        elif new_d_arm_rev.count('CG') + new_u_arm_rev.count('CG') > max_cpgs_in_arms:
+                            pass
+                        else:
+                            upstream_id_rev = record.id.split(':')[0] + ":" + str(int(record.id.split(':')[1].split("-")[0]) + (
+                                        record_length - start_loc_upstream - arm_length_upstream)) + "-" + str(
+                                int(record.id.split(':')[1].split("-")[0]) + (record_length - start_loc_upstream - 1))
+                            downstream_id_rev = record.id.split(':')[0] + ":" + str(
+                                int(record.id.split(':')[1].split("-")[0]) + (record_length - start_loc)) + "-" + str(
+                                int(record.id.split(':')[1].split("-")[0]) + (
+                                            record_length - start_loc + arm_length_downstream - 1))
+                            probe = [str(new_u_arm_rev), str(new_d_arm_rev), upstream_id_rev, downstream_id_rev, i,
+                                     target_length, '-', cpg_id]
+                            i += 1
+                            probe_list.append(probe)
     return probe_list
 
 
