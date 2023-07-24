@@ -109,7 +109,7 @@ def main():
         #Store conflicts per round
         conflicts = (nr_of_dimer_probes, tm_amount_out_of_range)
         conflicts_list.append(conflicts)
-        #If the conflicts are stable for 5 rounds in a row, stop the while loop
+        #If the conflicts are stable for 5 rounds in a row, stop the while loop, the optimization of dimers and probe tm is finished.
         if counter > 5:
             if len(set(conflicts_list[-5:])) == 1:
                 stable_boolean = False
