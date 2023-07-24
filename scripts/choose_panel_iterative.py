@@ -802,7 +802,7 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
         writer = csv.writer(handle, delimiter = ',')
         header = ['Genomic_locus', 'CpG_id', 'Probe_sequence', 'Upstream_arm_sequence', 'Backbone_sequence', 'Downstream_arm_sequence', 
                     'Genomic_locus_upstream_arm', 'Genomic_locus_downstream_arm', 'Target_length', 'Target_strand', 'Delta_Tm',
-                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score', 'upstream_cg_percentage', 'downstream_cg_percentage','Panel_id']
+                    'Tm_upstream_arm', 'Tm_downstream_arm', 'CpGs_in_arms', 'SNPs_in_arms', 'Hairpin_score', 'Dimer_score', 'upstream_cg_percentage', 'downstream_cg_percentage','Hits_on_Genome','Hit_at_target','Panel_id']
         writer.writerow(header)
         max_panel_id = 0
         for j, probe in enumerate(existing_probes):
@@ -836,10 +836,12 @@ def write_output(targets, output_name, chosen_set, conflicting_file, conflicting
                 dimer_score = dimer_scores[i]  # 16 Highest dimer score of probe
                 upstream_cg_percentage = GC(upstream_sequence)
                 downstream_cg_percentage = GC(downstream_sequence)
+                specificity = float('nan')
+                hit_at_target = float('nan')
                 panel_id = max_panel_id + 1
                 row=[locus, cpg_id, probe_sequence, upstream_sequence, backbone_sequence, downstream_sequence, upstream_locus,
                         downstream_locus, target_length, strandedness, delta_tm, tm_up, tm_down, cpg_conflict, snp_conflict,
-                        hairpin_score, dimer_score, upstream_cg_percentage, downstream_cg_percentage, panel_id]
+                        hairpin_score, dimer_score, upstream_cg_percentage, downstream_cg_percentage, specificity, hit_at_target, panel_id]
                 writer.writerow(row)
 
 if __name__ == '__main__':
