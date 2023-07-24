@@ -193,6 +193,7 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
 def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
     # Function to add amount of hits and inclusion of correct hit to the final chosen panel file.
     # Create a dictionary counter with the amount of hits per probe.
+    nr_of_probes_with_more_than_one_hit = 0
     spec_hit_list = [item[0] for item in aspecific_probe_list]
     probe_spec_dict = collections.Counter(spec_hit_list)
     with open(panel_path_csv,'r') as file:
@@ -211,6 +212,8 @@ def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
                     if str(i) in probe_spec_dict:
                         count = probe_spec_dict[str(i)]
                         row[-3] = count
+                        if count > 1:
+                            nr_of_probes_with_more_than_one_hit += 1
                     else:
                         row[-3] = 0
 
@@ -235,6 +238,7 @@ def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
     #Add specificity parameters to the final chosen panel file.
     os.system('rm ' + panel_path_csv)
     os.system('mv ' + new_panel_path_csv + ' ' + panel_path_csv)
+    print('There are ' + str(nr_of_probes_with_more_than_one_hit) + ' probes which target more than one location.' )
     return
 
 
