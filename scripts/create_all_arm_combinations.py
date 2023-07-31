@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 import json
 from Bio import SeqIO, Seq, SeqRecord
 from Bio.SeqUtils import GC
+from Bio.SeqUtils import MeltingTemp as mt
 import multiprocessing as mp
 import csv
 import numpy as np
@@ -253,22 +254,10 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
 
 
 def get_delta_tm_array(probe_arms_array):
+    tm_up = np.array([np.array(np.round(mt.Tm_NN(string[0],nn_table = mt.DNA_NN3),1), dtype = np.float32) for string in probe_arms_array], dtype = np.float32)
+    tm_down =  np.array([np.array(np.round(mt.Tm_NN(string[1],nn_table = mt.DNA_NN3),1), dtype = np.float32) for string in probe_arms_array], dtype = np.float32)
     # Calculate the delta Tm between the arms of each probe.
-    A = [string[0].count('A') for string in probe_arms_array]
-    T = [string[0].count('T') for string in probe_arms_array]
-    G = [string[0].count('G') for string in probe_arms_array]
-    C = [string[0].count('C') for string in probe_arms_array]
-    tm_up = np.array([np.array(np.round(np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
-                                    np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))),1),dtype = np.float32) for i in
-             range(len(A))], dtype = np.float32)  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
-    A = [string[1].count('A') for string in probe_arms_array]
-    T = [string[1].count('T') for string in probe_arms_array]
-    G = [string[1].count('G') for string in probe_arms_array]
-    C = [string[1].count('C') for string in probe_arms_array]
-    tm_down = np.array([np.array(np.round(np.add(64.9, np.divide(np.multiply(41, np.add(G[i], np.subtract(C[i], 16.4))),
-                                      np.add(np.add(A[i], T[i]), np.add(C[i], G[i])))),1), dtype = np.float32) for i in
-               range(len(A))], dtype = np.float32)  # Tm=64.9+41*(G+C-16.4)/(A+T+C+G)
-    tms = np.array([np.round(np.absolute(np.subtract(tm_down[j], tm_up[j])), 1) for j in range(len(A))], dtype = np.float32)
+    tms = np.array([np.round(np.absolute(np.subtract(tm_down[j], tm_up[j])), 1) for j in range(len(probe_arms_array))], dtype = np.float32)
     return tms, tm_up, tm_down
 
 def report_cpgs_in_arms(probe_arms_array):
