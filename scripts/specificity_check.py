@@ -100,7 +100,7 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
         else:
             strandedness = 'both'
             print('genome strandedness is ' + str(strandedness))
-        os.system('blastn -db ' + genome + ' -query ' + panel_arm_path_fasta + ' -out ' + outputdir  + 'specificity_output_' + str(i) + '.blast8 ' + '-outfmt 6 -word_size ' + str(tile_size) + ' -min_raw_gapped_score ' + str(min_score) + ' -num_threads ' + str(nr_cores) + ' -strand ' + strandedness)
+        os.system('blastn -db ' + genome + ' -query ' + panel_arm_path_fasta + ' -out ' + outputdir  + 'specificity_output_' + str(i) + '.blast8 ' + '-outfmt 6 -word_size ' + str(tile_size) + ' -min_raw_gapped_score ' + str(min_score) + ' -num_threads ' + str(nr_cores) + ' -strand ' + strandedness + ' -dust no -soft_masking false')
     # Report hits of the two arms in one probe in close proximity of eachother for each of the strands of the (converted) DNA.
     # These hits can be the locations in which a product can be formed at probe capture.
     # Since we collate the hits per reference genome, we already restrict for arms binding on the same strand.
@@ -143,26 +143,16 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
                 locus_list_u = list(hits_per_probe_u[key])
                 locus_list_d = list(hits_per_probe_d[d_key])
                 # Report the hits for which the two arms are in a distance closer than the target_region parameter
-                differences_list = [(abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d)]
                 # To implement: Directionality check
                     #Could this combination of aligned arms result in a circularized product after capture?
-                differences_list_directionality = []
                 if 'GA' in genome:
+                    differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 < x2)
                     # only keep hits at which y1 is lower than x2. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
-                    for hit in differences_list:
-                        y1 = hit[1][1]
-                        x2 = hit[1][0]
-                        if y1 < x2:
-                            differences_list_directionality.append(hit)
                 elif 'CT' in genome:
                     # only keep hits at which x2 is lower than y1. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
-                    for hit in differences_list:
-                        y1 = hit[1][1]
-                        x2 = hit[1][0]
-                        if x2 < y1:
-                            differences_list_directionality.append(hit)
+                    differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 > x2)
 
-                alignment_differences = sorted(filter(lambda x: x[0] <= target_region, differences_list_directionality))
+                alignment_differences = sorted(filter(lambda x: x[0] <= target_region, differences_generator))
                 amount_of_alignments = len(alignment_differences)
 
                 # To implement: Strand check
