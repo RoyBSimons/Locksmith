@@ -80,7 +80,9 @@ rule create_probes:
                 probes = config['output_directory'] + "/possible_probe_info/possible_probes_all_targets.csv",
                 hairpins = config['output_directory'] + "/possible_probe_info/hairpin_scores.csv",
                 snp = config['output_directory'] + "/possible_probe_info/snp_conflicts.csv",
-		arms = config['output_directory'] + "/possible_probe_info/probe_arms.pickle"
+		arms = config['output_directory'] + "/possible_probe_info/probe_arms.pickle",
+		tms_down = config['output_directory'] + "/possible_probe_info/tms_down.pickle",
+		tms_up = config['output_directory'] + "/possible_probe_info/tms_up.pickle"
 
 	log:
 		out = config['output_directory'] + "/logs/create_probes_stdout.log",
