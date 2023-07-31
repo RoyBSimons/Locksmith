@@ -157,7 +157,7 @@ def create_cpg_id_list(bed_file):
     return cpg_id_list
 
 def C_to_T_convert(probe_arm):
-    adjusted_probe_arm = probe_arm.replace('CG','__').replace('G','A').replace('__','CG')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A, while keeping CGs intact.
+    adjusted_probe_arm = probe_arm.replace('CG','__').replace('G','A').replace('__','CR')  # As the gDNA converts the C to T, the probe(which is the complement) must change from G to A, while keeping CGs intact.
     return adjusted_probe_arm
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
@@ -186,6 +186,9 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                 start_loc_upstream = start_loc + target_length
                 new_d_arm = record.seq[start_loc - arm_length_downstream:start_loc]
                 if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                    # If the arm starts in the middle of a CpG, account for the methylation state with the degenerate nucleotide R.
+                    if new_d_arm[0] == 'G' and record.seq[start_loc - arm_length_downstream-1] == 'C':
+                        new_d_arm = 'R' + new_d_arm[1:]
                     new_d_arm = C_to_T_convert(new_d_arm)
                 else:
                     pass
@@ -199,12 +202,15 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                     for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
                         new_u_arm = record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
                         if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                            # If the arm starts in the middle of a CpG, account for the methylation state with the degenerate nucleotide R.
+                            if new_u_arm[0] == 'G' and record.seq[start_loc_upstream-1] == 'C':
+                                new_u_arm = 'R' + new_u_arm[1:]
                             new_u_arm = C_to_T_convert(new_u_arm)
                         else:
                             pass
                         if GC(new_u_arm) > max_cg_percentage or GC(new_u_arm) < min_cg_percentage:
                             pass
-                        elif new_d_arm.count('CG') + new_u_arm.count('CG') > max_cpgs_in_arms:
+                        elif new_d_arm.count('R') + new_u_arm.count('R') > max_cpgs_in_arms:
                             pass
                         else:
                             upstream_id = record.id.split(':')[0] + ":" + str(
@@ -222,6 +228,9 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                 start_loc_upstream = start_loc + target_length
                 new_d_arm_rev = rev_record.seq[start_loc - arm_length_downstream:start_loc]
                 if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                    # If the arm starts in the middle of a CpG, account for the methylation state with the degenerate nucleotide R.
+                    if new_d_arm_rev[0] == 'G' and rev_record.seq[start_loc - arm_length_downstream-1] == 'C':
+                        new_d_arm_rev = 'R' + new_d_arm_rev[1:]
                     new_d_arm_rev = C_to_T_convert(new_d_arm_rev)
                 else:
                     pass
@@ -231,12 +240,15 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                     for arm_length_upstream in range(min_arm_length, max_arm_length + 1):
                         new_u_arm_rev = rev_record.seq[start_loc_upstream:start_loc_upstream + arm_length_upstream]
                         if conversion == 'bisulfite':  # Adjust probe for conversion of DNA
+                            # If the arm starts in the middle of a CpG, account for the methylation state with the degenerate nucleotide R.
+                            if new_u_arm_rev[0] == 'G' and rev_record.seq[start_loc_upstream-1] == 'C':
+                                new_u_arm_rev = 'R' + new_u_arm_rev[1:]
                             new_u_arm_rev = C_to_T_convert(new_u_arm_rev)
                         else:
                             pass
                         if GC(new_u_arm_rev) > max_cg_percentage or GC(new_u_arm_rev) < min_cg_percentage:
                             pass
-                        elif new_d_arm_rev.count('CG') + new_u_arm_rev.count('CG') > max_cpgs_in_arms:
+                        elif new_d_arm_rev.count('R') + new_u_arm_rev.count('R') > max_cpgs_in_arms:
                             pass
                         else:
                             upstream_id_rev = record.id.split(':')[0] + ":" + str(int(record.id.split(':')[1].split("-")[0]) + (
@@ -262,8 +274,8 @@ def get_delta_tm_array(probe_arms_array):
 
 def report_cpgs_in_arms(probe_arms_array):
     # Count the amount of CpGs in the arms of each probe.
-    upstream_count = [string[0].count('CG') for string in probe_arms_array]
-    downstream_count = [string[1].count('CG') for string in probe_arms_array]
+    upstream_count = [string[0].count('R') for string in probe_arms_array]
+    downstream_count = [string[1].count('R') for string in probe_arms_array]
     counts_array = [np.add(upstream_count[i], downstream_count[i]) for i in range(len(upstream_count))]
     return counts_array
 
@@ -299,8 +311,8 @@ def check_probe_for_hairpin_score(probes, fasta_name, output_name_json, score_cu
     else:
         for hairpin in hairpin_list:
             hairpin_score = hairpin['Score']
-            probe_nr = int(hairpin['Seq']['ID'])
-            hairpin_scores[probe_nr] = hairpin_score
+            probe_nr = int(hairpin['Seq']['ID'].split('.')[0])
+            hairpin_scores[probe_nr] = max(hairpin_score,hairpin_scores[probe_nr])
     return hairpin_scores
 
 
