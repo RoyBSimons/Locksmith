@@ -205,7 +205,7 @@ The files must be end with the following name format: ‘_[nr/X/Y].[fasta extens
 
 Create CpG bed files for all chromosomes with the following command:
 ```
-python scripts/preprocessing/generalize_genome_headers.py –g <Path to chromosome fasta files with wildcard> -c <Path to chr2acc file>
+python scripts/preprocessing/create_cpg_ids_from_reference_genome.py –g <Path to chromosome fasta files with wildcard> -c <Path to chr2acc file>
 ```
 -	Target_list.bed
 
