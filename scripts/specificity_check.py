@@ -115,43 +115,70 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
                 hit_list.append(row)
                 probe_ref_gen_combination = row[0] + '.' + row[1]
                 arm_type = row[0][-1]
-                if arm_type == 'u':
+                conv_genome = row[1].split('_')[-2]
+                if arm_type == 'u' and conv_genome == 'GA':
                     if probe_ref_gen_combination in hits_per_probe_u.keys():
                         pass
                     else:
                         hits_per_probe_u[probe_ref_gen_combination] = set()
-                else:
+                elif arm_type == 'd' and conv_genome == 'GA':
                     if probe_ref_gen_combination in hits_per_probe_d.keys():
                         pass
                     else:
                         hits_per_probe_d[probe_ref_gen_combination] = set()
+                if arm_type == 'u' and conv_genome == 'CT':
+                    if probe_ref_gen_combination in hits_per_probe_d.keys():
+                        pass
+                    else:
+                        hits_per_probe_d[probe_ref_gen_combination] = set()
+                elif arm_type == 'd' and conv_genome == 'CT':
+                    if probe_ref_gen_combination in hits_per_probe_u.keys():
+                        pass
+                    else:
+                        hits_per_probe_u[probe_ref_gen_combination] = set()
         for hit in hit_list:
             arm_type = hit[0][-1] #u denotes upstream arm, d denotes downstream arm
             probe_ref_gen_combination = hit[0] + '.' + hit[1]
-            locus = (int(hit[8]),int(hit[9]))
-            if arm_type == 'u':
-                hits_per_probe_u[probe_ref_gen_combination].add(locus)
+            conv_genome = hit[1].split('_')[-2]
+            if conversion == 'bisulfite':
+                if arm_type == 'u' and conv_genome == 'GA':
+                    locus = (int(hit[8]),int(hit[9]))
+                    hits_per_probe_u[probe_ref_gen_combination].add(locus)
+                elif arm_type == 'd' and conv_genome == 'GA':
+                    locus = (int(hit[8]),int(hit[9]))
+                    hits_per_probe_d[probe_ref_gen_combination].add(locus)
+                elif arm_type == 'u' and conv_genome == 'CT':
+                    locus = (int(hit[9]),int(hit[8]))
+                    hits_per_probe_d[probe_ref_gen_combination].add(locus)
+                elif arm_type == 'd' and conv_genome == 'CT':
+                    locus = (int(hit[9]),int(hit[8]))
+                    hits_per_probe_u[probe_ref_gen_combination].add(locus)
             else:
-                hits_per_probe_d[probe_ref_gen_combination].add(locus)
-            
+                if arm_type == 'u':
+                     locus = (int(hit[8]),int(hit[9]))
+                     hits_per_probe_u[probe_ref_gen_combination].add(locus)
+                elif arm_type == 'd':
+                     locus = (int(hit[8]),int(hit[9]))
+                     hits_per_probe_d[probe_ref_gen_combination].add(locus)
+
+
         for key in list(hits_per_probe_u.keys()):
             split_key = key.split('.')
             probe_nr = split_key[0].split('_')[0]
             chr_nr = split_key[1] #.split('_')[0]
-            d_key = probe_nr + '_' + 'd' + '.' + chr_nr
+            arm_type = split_key[0].split('_')[1]
+            if arm_type == 'u':
+                d_key = probe_nr + '_' + 'd' + '.' + chr_nr
+            else:
+                d_key = probe_nr + '_' + 'u' + '.' + chr_nr
             if d_key in list(hits_per_probe_d.keys()):
                 locus_list_u = list(hits_per_probe_u[key])
                 locus_list_d = list(hits_per_probe_d[d_key])
                 # Report the hits for which the two arms are in a distance closer than the target_region parameter
+                differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 < x2)
+                # only keep hits at which y1 is lower than x2. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
                 # To implement: Directionality check
                     #Could this combination of aligned arms result in a circularized product after capture?
-                if 'GA' in genome:
-                    differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 < x2)
-                    # only keep hits at which y1 is lower than x2. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
-                elif 'CT' in genome:
-                    # only keep hits at which x2 is lower than y1. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
-                    differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 > x2)
-
                 alignment_differences = sorted(filter(lambda x: x[0] <= target_region, differences_generator))
                 amount_of_alignments = len(alignment_differences)
 
@@ -183,6 +210,7 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
 def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
     # Function to add amount of hits and inclusion of correct hit to the final chosen panel file.
     # Create a dictionary counter with the amount of hits per probe.
+    intended_hits_list= []
     nr_of_probes_with_more_than_one_hit = 0
     spec_hit_list = [item[0] for item in aspecific_probe_list]
     probe_spec_dict = collections.Counter(spec_hit_list)
@@ -208,7 +236,7 @@ def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
                         row[-3] = 0
 
                     hits_for_target_i_list = [item for item in aspecific_probe_list if int(item[0]) == i]
-                    hit_boolean = 0
+                    hit_region = 0
                     if row[9] == '+':
                         start = int(row[7].split(':')[1].split('-')[0])+1
                         end = int(row[6].split(':')[1].split('-')[1])+1
@@ -220,10 +248,13 @@ def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
                         hit_u = hit[3]
                         hit_d = hit[4]
                         if hit_u >= start and hit_u <= end and hit_d >= start and hit_d <= end:
-                            hit_boolean = 1
+                            if hit_u > hit_d: #If the hit is on the positive strand
+                                hit_region = str(hit[1]).split('_')[0] + ':' + str(hit_d-1) + '-' + str(hit_u-1)
+                            else:
+                                hit_region = str(hit[1]).split('_')[0] + ':' + str(hit_u-1) + '-' + str(hit_d-1)
                             break
                     # Return a 1 if the intented target is in included in the hits.
-                    row[-2] = hit_boolean
+                    row[-2] = hit_region
                 writer.writerow(row)
     #Add specificity parameters to the final chosen panel file.
     os.system('rm ' + panel_path_csv)
