@@ -63,7 +63,7 @@ def main():
             reader = csv.reader(handle, delimiter = ',')
             next(reader,None)
             for row in reader:
-                if len(row) > 2:  #if there is a probe in the panel for this locus
+                if len(row) > 2 and row[2] != '':  #if there is a probe in the panel for this locus
                     existing_probes.append(row)
                     existing_probes_tm.append(float(row[11]))
                     existing_probes_tm.append(float(row[12]))

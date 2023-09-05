@@ -14,8 +14,8 @@ def main():
     panel_path_csv = args["panel_path_csv"]
     output_path = args["output_path"]
     conversion, ref_genomes_list, tile_size, min_match, min_score, target_region, outputdir, nr_cores = import_config(config_file)
-    panel_arm_path_fasta = create_probe_arm_fasta(outputdir, panel_path_csv)
-    aspecific_probe_list = check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, outputdir, tile_size, min_match, min_score, target_region, nr_cores)
+    (panel_arm_path_fasta_u,panel_arm_path_fasta_d) = create_probe_arm_fasta(outputdir, panel_path_csv)
+    aspecific_probe_list = check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta_u, panel_arm_path_fasta_d, outputdir, tile_size, min_match, min_score, target_region, nr_cores)
     #write hits to file
     with open(output_path, 'w') as handle:
         writer = csv.writer(handle, delimiter = ',')
@@ -51,11 +51,13 @@ def import_config(config_file):
     ref_genomes_list = []
     if conversion == 'bisulfite':
         PATH_to_reference_bisulfite_genome_folder = config_object['PATH_to_reference_bisulfite_genome_folder']
-        ref_genomes_list = os.listdir(PATH_to_reference_bisulfite_genome_folder + '/CT_conversion')
-        ref_genomes_list_CT = [PATH_to_reference_bisulfite_genome_folder + '/CT_conversion/'  + ref_genomes for ref_genomes in ref_genomes_list if ref_genomes[-3:] == '.fa']
-        ref_genomes_list = os.listdir(PATH_to_reference_bisulfite_genome_folder + '/GA_conversion')
-        ref_genomes_list_GA = [PATH_to_reference_bisulfite_genome_folder + '/GA_conversion/'  + ref_genomes for ref_genomes in ref_genomes_list if ref_genomes[-3:] == '.fa']
-        ref_genomes_list = [*ref_genomes_list_CT,*ref_genomes_list_GA] 
+        #ref_genomes_list = os.listdir(PATH_to_reference_bisulfite_genome_folder + '/CT_conversion')
+        #ref_genomes_list_CT = [PATH_to_reference_bisulfite_genome_folder + '/CT_conversion/'  + ref_genomes for ref_genomes in ref_genomes_list if ref_genomes[-3:] == '.fa']
+        #ref_genomes_list = os.listdir(PATH_to_reference_bisulfite_genome_folder + '/GA_conversion')
+        #ref_genomes_list_GA = [PATH_to_reference_bisulfite_genome_folder + '/GA_conversion/'  + ref_genomes for ref_genomes in ref_genomes_list if ref_genomes[-3:] == '.fa']
+        #ref_genomes_list = [*ref_genomes_list_CT,*ref_genomes_list_GA] 
+        ref_genomes_list = os.listdir(PATH_to_reference_bisulfite_genome_folder + '/combined')
+        ref_genomes_list = [PATH_to_reference_bisulfite_genome_folder + '/combined/'  + ref_genomes for ref_genomes in ref_genomes_list if ref_genomes[-3:] == '.fa']
     else:
         path_to_reference_genome = config_object['PATH_to_reference_genome_fasta']
         ref_genomes_list.append(path_to_reference_genome)
@@ -72,23 +74,25 @@ def create_probe_arm_fasta(outputdir, panel_path_csv):
                 d_arm = row[5]
                 probe_nr = i
                 arms.append([str(probe_nr),u_arm,d_arm])
-    panel_arm_path_fasta = outputdir + 'probe_arms.fasta'
-    with open(panel_arm_path_fasta,'w') as outfile:
+    panel_arm_path_fasta_u = outputdir + 'probe_u_arms.fasta'
+    with open(panel_arm_path_fasta_u,'w') as outfile:
         writer = csv.writer(outfile,delimiter = '\n')
         for row in arms:
             writer.writerow(['>'+row[0]+'_u'])
             writer.writerow([row[1]])
+    panel_arm_path_fasta_d = outputdir + 'probe_d_arms.fasta'
+    with open(panel_arm_path_fasta_d,'w') as outfile:
+        writer = csv.writer(outfile,delimiter = '\n')
+        for row in arms:
             writer.writerow(['>'+row[0]+'_d'])
             writer.writerow([row[2]])
-    return panel_arm_path_fasta
+    return (panel_arm_path_fasta_u,panel_arm_path_fasta_d)
 
-def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, outputdir, tile_size, min_match, min_score, target_region, nr_cores):
+def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta_u, panel_arm_path_fasta_d, outputdir, tile_size, min_match, min_score, target_region, nr_cores):
     # If we design a panel for bisulfite converted DNA, blast agains 2 versions of the DNA.
     # C-to-T converted and G-to-A converted.
     # Since we design probes with prefereably no CpGs int he arms, we do not have to take into account whether CpGs are methylated or not. For the probes that do have a CpG or SNP in the arms, this could result in a single mismatch when aligning to the reference genome. These probes should still report back a hit since we look for a lower score than perfect match.
     aspecific_probe_list = []
-    print(ref_genomes_list)
-    print(panel_arm_path_fasta)
     for i, genome in enumerate(ref_genomes_list):
         # Define alignment: bottom strand aslignemnt at CT genome and top strand alignment at GA genome as these are the strand which should correspond to the arms of the padlock probes.
         if 'GA' in genome:
@@ -100,7 +104,9 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
         else:
             strandedness = 'both'
             print('genome strandedness is ' + str(strandedness))
-        os.system('blastn -db ' + genome + ' -query ' + panel_arm_path_fasta + ' -out ' + outputdir  + 'specificity_output_' + str(i) + '.blast8 ' + '-outfmt 6 -word_size ' + str(tile_size) + ' -min_raw_gapped_score ' + str(min_score) + ' -num_threads ' + str(nr_cores) + ' -strand ' + strandedness + ' -dust no -soft_masking false')
+        out_format = """"6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen" """
+        os.system('blastn -db ' + genome + ' -query ' + panel_arm_path_fasta_u + ' -out ' + outputdir  + 'specificity_output_u_' + str(i) + '.blast8 ' + '-outfmt ' + out_format  + '-word_size ' + str(tile_size) + ' -min_raw_gapped_score ' + str(min_score) + ' -num_threads ' + str(nr_cores) + ' -strand ' + strandedness + ' -dust no -soft_masking false' )
+        os.system('blastn -db ' + genome + ' -query ' + panel_arm_path_fasta_d + ' -out ' + outputdir  + 'specificity_output_d_' + str(i) + '.blast8 ' + '-outfmt ' + out_format +  '-word_size ' + str(tile_size) + ' -min_raw_gapped_score ' + str(min_score) + ' -num_threads ' + str(nr_cores) + ' -strand ' + strandedness + ' -dust no -soft_masking false' )
     # Report hits of the two arms in one probe in close proximity of eachother for each of the strands of the (converted) DNA.
     # These hits can be the locations in which a product can be formed at probe capture.
     # Since we collate the hits per reference genome, we already restrict for arms binding on the same strand.
@@ -109,33 +115,43 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
         hits_per_probe_d = {}
         hit_list = []
         origin_fasta_filename = genome.split('.')[0]
-        with open(outputdir + 'specificity_output_' + str(i) + '.blast8') as handle:
+        with open(outputdir + 'specificity_output_u_' + str(i) + '.blast8') as handle:
             reader = csv.reader(handle, delimiter = '\t')
             for row in reader:
-                hit_list.append(row)
-                probe_ref_gen_combination = row[0] + '.' + row[1]
-                arm_type = row[0][-1]
-                conv_genome = row[1].split('_')[-2]
-                if arm_type == 'u' and conv_genome == 'GA':
-                    if probe_ref_gen_combination in hits_per_probe_u.keys():
-                        pass
-                    else:
-                        hits_per_probe_u[probe_ref_gen_combination] = set()
-                elif arm_type == 'd' and conv_genome == 'GA':
-                    if probe_ref_gen_combination in hits_per_probe_d.keys():
-                        pass
-                    else:
-                        hits_per_probe_d[probe_ref_gen_combination] = set()
-                if arm_type == 'u' and conv_genome == 'CT':
-                    if probe_ref_gen_combination in hits_per_probe_d.keys():
-                        pass
-                    else:
-                        hits_per_probe_d[probe_ref_gen_combination] = set()
-                elif arm_type == 'd' and conv_genome == 'CT':
-                    if probe_ref_gen_combination in hits_per_probe_u.keys():
-                        pass
-                    else:
-                        hits_per_probe_u[probe_ref_gen_combination] = set()
+                start_loc = row[4]
+                if start_loc == '0': #The upstream arm binds at the 5' end and can be ligated.
+                    hit_list.append(row)
+                    probe_ref_gen_combination = row[0] + '.' + row[1]
+                    conv_genome = row[1].split('_')[-2]
+                    if conv_genome == 'GA':
+                        if probe_ref_gen_combination in hits_per_probe_u.keys():
+                            pass
+                        else:
+                            hits_per_probe_u[probe_ref_gen_combination] = set()
+                    elif conv_genome == 'CT':
+                        if probe_ref_gen_combination in hits_per_probe_d.keys():
+                            pass
+                        else:
+                            hits_per_probe_d[probe_ref_gen_combination] = set()
+        with open(outputdir + 'specificity_output_d_' + str(i) + '.blast8') as handle:
+            reader = csv.reader(handle, delimiter = '\t')
+            for row in reader:
+                qlen = row[-1]
+                qend = row[7]
+                if qlen == qend: #The downstream arm binds at the 3' end and can be elongated.
+                    hit_list.append(row)
+                    probe_ref_gen_combination = row[0] + '.' + row[1]
+                    conv_genome = row[1].split('_')[-2]
+                    if  conv_genome == 'GA':
+                        if probe_ref_gen_combination in hits_per_probe_d.keys():
+                            pass
+                        else:
+                            hits_per_probe_d[probe_ref_gen_combination] = set()
+                    elif conv_genome == 'CT':
+                        if probe_ref_gen_combination in hits_per_probe_u.keys():
+                            pass
+                        else:
+                            hits_per_probe_u[probe_ref_gen_combination] = set()
         for hit in hit_list:
             arm_type = hit[0][-1] #u denotes upstream arm, d denotes downstream arm
             probe_ref_gen_combination = hit[0] + '.' + hit[1]
@@ -179,6 +195,12 @@ def check_specificity(conversion, ref_genomes_list, panel_arm_path_fasta, output
                 # only keep hits at which y1 is lower than x2. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
                 # To implement: Directionality check
                     #Could this combination of aligned arms result in a circularized product after capture?
+#                if 'GA' in genome:
+ #                   differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 < x2)
+  #                  # only keep hits at which y1 is lower than x2. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
+   #             elif 'CT' in genome:
+    #                # only keep hits at which x2 is lower than y1. --> The downstream arm binds downstream of the upstream arm and the probe can be elongated and circularized.
+#                    differences_generator = ((abs(x2-y1),(x2,y1)) for (x1,x2), (y1,y2) in itertools.product(locus_list_u,locus_list_d) if y1 > x2)
                 alignment_differences = sorted(filter(lambda x: x[0] <= target_region, differences_generator))
                 amount_of_alignments = len(alignment_differences)
 
@@ -252,7 +274,6 @@ def append_nr_of_hits_to_panel(panel_path_csv,aspecific_probe_list):
                                 hit_region = str(hit[1]).split('_')[0] + ':' + str(hit_d-1) + '-' + str(hit_u-1)
                             else:
                                 hit_region = str(hit[1]).split('_')[0] + ':' + str(hit_u-1) + '-' + str(hit_d-1)
-                            break
                     # Return a 1 if the intented target is in included in the hits.
                     row[-2] = hit_region
                 writer.writerow(row)
