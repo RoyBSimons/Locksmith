@@ -6,6 +6,7 @@ import json
 from Bio import SeqIO, Seq, SeqRecord
 from Bio.SeqUtils import GC
 from Bio.SeqUtils import MeltingTemp as mt
+from Bio.SeqUtils.lcc import lcc_simp
 import multiprocessing as mp
 import csv
 import numpy as np
@@ -25,8 +26,7 @@ def main():
     acc_nr_to_chrom_nr_file = args["acc_nr_to_chrom_nr_file"]
     ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, max_target_length, \
         target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, freq_threshold, \
-        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe , conversion = import_config(config_file)  # Import parameters set in configuration file
-
+        score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe, conversion, complexity_threshold = import_config(config_file)  # Import parameters set in configuration file
     final_start = time.time()
     start = time.time()
     cpg_id_list = create_cpg_id_list(bed_file)  # Obtain CpG list from target bed_file
@@ -42,7 +42,7 @@ def main():
                                                                                  max_target_length, min_arm_length,
                                                                                  max_arm_length, min_cg_percentage,
                                                                                  max_cg_percentage, cpg_flanks, mid_loc,
-                                                                                 cpg_id_list[i], max_cpgs_in_arms, conversion)
+                                                                                 cpg_id_list[i], max_cpgs_in_arms, conversion, complexity_threshold)
             # Obtain a 2D array containing the amount of frequent SNPs in the arms of the padlock probe.
             # Each row consist of the amount of SNPs in the arms for all possible padlock probes to target one CpG.
             # Frequency threshold is set in configuration file
@@ -127,6 +127,7 @@ def import_config(config_file):  # import config file
     max_cpgs_in_arms = int(probe_specifics["max_cpgs_in_arms"])
     max_snps_in_arms = int(probe_specifics["max_snps_in_arms"])
     max_delta_tm_probe = float(probe_specifics["max_delta_tm_probe"])
+    complexity_threshold = float(probe_specifics["complexity_threshold"])
     conversion = probe_specifics["conversion"]
 
     # patch backbone together
@@ -145,7 +146,7 @@ def import_config(config_file):  # import config file
 
     return ftp_path_snp_database, probe_specifics, min_arm_length, max_arm_length, min_target_length, \
         max_target_length, target_range, cpg_flanks, max_cg_percentage, min_cg_percentage, backbone_sequence, mid_loc, \
-        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe, conversion
+        freq_threshold, score_cutoff, tm_cutoff, max_cpgs_in_arms, max_snps_in_arms, max_delta_tm_probe, conversion, complexity_threshold
 
 
 def create_cpg_id_list(bed_file):
@@ -161,7 +162,7 @@ def C_to_T_convert(probe_arm):
     return adjusted_probe_arm
 
 def create_all_possible_arms_both_strands(record, min_target_length, max_target_length, min_arm_length, max_arm_length,
-                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id, max_cpgs_in_arms, conversion):
+                                          min_cg_percentage, max_cg_percentage, cpg_flanks, mid_loc, cpg_id, max_cpgs_in_arms, conversion, complexity_threshold):
     # Obtain the list of possible arm combinations for one record (target CpG in the Fasta file).
     # Each nested value is a list containing the following information:
         # 0 [Sequence Upstream arm
@@ -218,7 +219,10 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                                 int(record.id.split(':')[1].split("-")[0]) + start_loc_upstream + arm_length_upstream - 1)
                             probe = [str(new_u_arm), str(new_d_arm), upstream_id, downstream_id, i, target_length, '+', cpg_id]
                             i += 1
-                            probe_list.append(probe)
+                            if lcc_simp(new_u_arm) < complexity_threshold or lcc_simp(new_d_arm) < complexity_threshold:
+                                pass # Do not add probes with low complexity arms
+                            else:
+                                probe_list.append(probe)
     for target_length in range(min_target_length,  # Find all arms from - strand
                                max_target_length + 1):  # loop over range of target lengths, including the maximum
         for arm_length_downstream in range(min_arm_length, max_arm_length + 1):
@@ -261,7 +265,10 @@ def create_all_possible_arms_both_strands(record, min_target_length, max_target_
                             probe = [str(new_u_arm_rev), str(new_d_arm_rev), upstream_id_rev, downstream_id_rev, i,
                                      target_length, '-', cpg_id]
                             i += 1
-                            probe_list.append(probe)
+                            if lcc_simp(new_u_arm) < complexity_threshold or lcc_simp(new_d_arm) < complexity_threshold:
+                                pass
+                            else:
+                                probe_list.append(probe)
     return probe_list
 
 
